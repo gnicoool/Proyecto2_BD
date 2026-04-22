@@ -60,7 +60,6 @@ CREATE TABLE Compra_Producto(
     id_compra INT,
     id_producto INT,
     cantidad_compra INT not null,
-    precio_compra DECIMAL(10,2) not null references Producto(precio_compra),
     PRIMARY KEY (id_compra, id_producto),
     FOREIGN KEY (id_compra) REFERENCES Compra(id_compra),
     FOREIGN KEY (id_producto) REFERENCES Producto(id_producto)
@@ -96,7 +95,6 @@ CREATE TABLE Venta_Producto(
     id_venta INT,
     id_producto INT,
     cantidad_venta INT not null,
-    precio_venta DECIMAL(10,2) not null references Producto(precio_venta),
     PRIMARY KEY (id_venta, id_producto),
     FOREIGN KEY (id_venta) REFERENCES Venta(id_venta),
     FOREIGN KEY (id_producto) REFERENCES Producto(id_producto)
