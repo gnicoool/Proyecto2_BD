@@ -23,6 +23,12 @@ CREATE TABLE Categoria(
     descripcion VARCHAR(100)
 );
 
+CREATE TABLE Marca(
+    id_marca SERIAL PRIMARY KEY,
+    nombre VARCHAR(50) NOT NULL UNIQUE,
+    activo BOOLEAN DEFAULT true
+);
+
 CREATE TABLE Producto(
     id_producto SERIAL PRIMARY KEY,
     nombre VARCHAR(50) not null,
@@ -31,7 +37,10 @@ CREATE TABLE Producto(
     precio_compra DECIMAL(10,2) not null,
     cant_disponible INT not null default 0,
     id_categoria INT not null,
-    FOREIGN KEY (id_categoria) REFERENCES Categoria(id_categoria)
+    activo boolean not null default True,
+    id_marca int not null,
+    FOREIGN KEY (id_categoria) REFERENCES Categoria(id_categoria),
+    FOREIGN KEY (id_marca) REFERENCES Marca(id_marca)
 );
 
 CREATE TABLE Cliente(
