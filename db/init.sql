@@ -26,7 +26,7 @@ CREATE TABLE Categoria(
 CREATE TABLE Marca(
     id_marca SERIAL PRIMARY KEY,
     nombre VARCHAR(50) NOT NULL UNIQUE,
-    activo BOOLEAN DEFAULT true
+    activo BOOLEAN not null DEFAULT true
 );
 
 CREATE TABLE Producto(
@@ -52,8 +52,8 @@ CREATE TABLE Cliente(
 CREATE TABLE Proveedor(
     nit_proveedor VARCHAR(8) PRIMARY KEY not null,
     nombre VARCHAR(50) not null,
-    correo VARCHAR(50),
-    tel_proveedor VARCHAR(20),
+    correo VARCHAR(50) not null,
+    tel_proveedor VARCHAR(20) not null,
     activo boolean not null default true
 );
 
@@ -83,7 +83,7 @@ CREATE TABLE Usuario(
     nit_empleado VARCHAR(8) PRIMARY KEY not null,
     nombre VARCHAR(50) not null,
     tel_empleado VARCHAR(50),
-    correo VARCHAR(50) UNIQUE,
+    correo VARCHAR(50) not null UNIQUE,
     contrasena VARCHAR(255) not null,
     activo boolean not null default true, 
     id_rol INT not null,
@@ -95,7 +95,7 @@ CREATE TABLE Venta(
     fecha TIMESTAMP not null default now(),
     total DECIMAL(10,2) not null,
     id_cliente INT,
-    nit_empleado VARCHAR(8),
+    nit_empleado VARCHAR(8) not null,
     FOREIGN KEY (id_cliente) REFERENCES Cliente(id_cliente),
     FOREIGN KEY (nit_empleado) REFERENCES Usuario(nit_empleado)
 );
