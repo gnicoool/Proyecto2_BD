@@ -35,3 +35,8 @@ class VentaCabeceraOut(BaseModel):
     nit_empleado: Optional[str] = None
     cliente_nombre: Optional[str] = None
     empleado_nombre: Optional[str] = None
+
+
+class VentaDetalleOut(BaseModel):
+    venta: VentaCabeceraOut
+    lineas: List[VentaProductoLineOut]
