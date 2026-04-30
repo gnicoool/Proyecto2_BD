@@ -16,6 +16,7 @@ class EmpleadoGet(BaseModel):
     tel_empleado: Optional[str] = None
     correo: str
     id_rol : int
+    nombre_rol: str
     activo: bool
     total_ventas: int = 0
 

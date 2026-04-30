@@ -95,7 +95,7 @@ CREATE TABLE Venta(
     fecha TIMESTAMP not null default now(),
     total DECIMAL(10,2) not null,
     id_cliente INT,
-    nit_empleado VARCHAR(8) not null,
+    nit_empleado VARCHAR(8),
     FOREIGN KEY (id_cliente) REFERENCES Cliente(id_cliente),
     FOREIGN KEY (nit_empleado) REFERENCES Usuario(nit_empleado)
 );
