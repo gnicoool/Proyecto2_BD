@@ -1,5 +1,7 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Plus } from "lucide-react";
 import { PersonasTable, type PersonaRow } from "../../components/personas/tablepersona";
+import { NuevoProveedorModal } from "../../components/modal/NuevaPersona/proveedor/NuevoProveedorModal";
 import { apiClient } from "../../lib/apiClient";
 import { adminNitHeaders } from "../../lib/adminHeaders";
 import { useAuth } from "../../hooks/useAuth";
@@ -18,9 +20,13 @@ function mapProveedor(p: ProveedorListItem): PersonaRow {
 
 export default function ProveedoresPage() {
   const { user } = useAuth();
-  const [rows, setRows] = useState<PersonaRow[]>([]);
+  const [items, setItems] = useState<ProveedorListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [createOpen, setCreateOpen] = useState(false);
+  const [editProveedor, setEditProveedor] = useState<ProveedorListItem | null>(null);
+
+  const rows = useMemo(() => items.map(mapProveedor), [items]);
 
   const load = useCallback(async () => {
     if (!user?.nit_empleado) return;
@@ -30,10 +36,10 @@ export default function ProveedoresPage() {
       const data = await apiClient.get<ProveedorListItem[]>("/proveedores/", {
         headers: adminNitHeaders(user.nit_empleado),
       });
-      setRows(data.map(mapProveedor));
+      setItems(data);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error al cargar proveedores");
-      setRows([]);
+      setItems([]);
     } finally {
       setLoading(false);
     }
@@ -42,6 +48,11 @@ export default function ProveedoresPage() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  const closeModal = () => {
+    setCreateOpen(false);
+    setEditProveedor(null);
+  };
 
   const handleDelete = async (nit: string) => {
     if (!user?.nit_empleado) return;
@@ -62,12 +73,44 @@ export default function ProveedoresPage() {
     }
   };
 
+  const openEdit = (nit: string) => {
+    const row = items.find((p) => p.nit_proveedor === nit);
+    if (!row) return;
+    setCreateOpen(false);
+    setEditProveedor(row);
+  };
+
+  const modalOpen = createOpen || editProveedor !== null;
+
   return (
     <div className="max-w-6xl">
-      <h1 className="mb-2 font-sans text-2xl font-bold text-neutral-950">Proveedores</h1>
-      <p className="mb-6 font-sans text-[0.9375rem] text-neutral-700">
-        Proveedores registrados y total de compras asociadas en el sistema.
-      </p>
+      <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <h1 className="mb-2 font-sans text-2xl font-bold text-neutral-950">Proveedores</h1>
+          <p className="font-sans text-[0.9375rem] text-neutral-700">
+            Proveedores registrados y total de compras asociadas en el sistema.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={() => {
+            setEditProveedor(null);
+            setCreateOpen(true);
+          }}
+          className="inline-flex items-center gap-2 rounded-lg bg-sky-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-sky-700"
+        >
+          <Plus className="h-4 w-4" strokeWidth={2.5} />
+          Nuevo proveedor
+        </button>
+      </div>
+
+      <NuevoProveedorModal
+        open={modalOpen}
+        onClose={closeModal}
+        onSuccess={() => void load()}
+        requestHeaders={user?.nit_empleado ? adminNitHeaders(user.nit_empleado) : undefined}
+        editProveedor={editProveedor}
+      />
 
       {loading ? (
         <p className="text-sm text-neutral-600">Cargando…</p>
@@ -82,9 +125,7 @@ export default function ProveedoresPage() {
               `Compras del proveedor NIT ${nit}: revisa informes o el módulo de compras (vista en construcción).`,
             );
           }}
-          onEdit={(nit) => {
-            window.alert(`Edición de proveedor ${nit} — formulario pendiente.`);
-          }}
+          onEdit={openEdit}
           onDelete={handleDelete}
         />
       )}
