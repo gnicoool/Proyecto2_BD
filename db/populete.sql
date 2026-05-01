@@ -358,3 +358,27 @@ INSERT INTO Venta_Producto (id_venta, id_producto, cantidad_venta) VALUES
 (29, 9, 15),
 (30, 13, 35),
 (30, 12, 20);
+
+-- =========================
+-- SERIAL sequences: actualizar los valores para que no choquen con los datos insertados
+-- =========================
+SELECT setval(
+    pg_get_serial_sequence('categoria', 'id_categoria'),
+    COALESCE((SELECT MAX(id_categoria) FROM categoria), 1)
+);
+SELECT setval(
+    pg_get_serial_sequence('cliente', 'id_cliente'),
+    COALESCE((SELECT MAX(id_cliente) FROM cliente), 1)
+);
+SELECT setval(
+    pg_get_serial_sequence('compra', 'id_compra'),
+    COALESCE((SELECT MAX(id_compra) FROM compra), 1)
+);
+SELECT setval(
+    pg_get_serial_sequence('rol', 'id_rol'),
+    COALESCE((SELECT MAX(id_rol) FROM rol), 1)
+);
+SELECT setval(
+    pg_get_serial_sequence('venta', 'id_venta'),
+    COALESCE((SELECT MAX(id_venta) FROM venta), 1)
+);
