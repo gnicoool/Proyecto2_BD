@@ -43,7 +43,6 @@ def explicit_transaction():
     conn.autocommit = False
     cur = conn.cursor(cursor_factory=RealDictCursor)
     try:
-        cur.execute("BEGIN")
         yield cur
         conn.commit()
     except Exception:

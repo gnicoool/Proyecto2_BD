@@ -1,7 +1,8 @@
 from decimal import Decimal
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, Header, HTTPException
 
+from auth_deps import require_admin
 from database import get_db
 from schemas.venta import (
     VentaCabeceraOut,
@@ -34,6 +35,53 @@ def list_ventas():
         )
         rows = cur.fetchall()
     return [VentaCabeceraOut(**r) for r in rows]
+
+
+def _ventas_cabecera_por_nit(nit: str) -> list[VentaCabeceraOut]:
+    with get_db() as cur:
+        cur.execute(
+            """
+            SELECT
+                v.id_venta,
+                v.fecha,
+                v.total,
+                v.id_cliente,
+                v.nit_empleado,
+                c.nombre AS cliente_nombre,
+                u.nombre AS empleado_nombre
+            FROM Venta v
+            LEFT JOIN Cliente c ON c.id_cliente = v.id_cliente
+            JOIN Usuario u ON u.nit_empleado = v.nit_empleado
+            WHERE v.nit_empleado = %s
+            ORDER BY v.id_venta DESC
+            """,
+            (nit,),
+        )
+        rows = cur.fetchall()
+    return [VentaCabeceraOut(**r) for r in rows]
+
+
+@router.get("/mis", response_model=list[VentaCabeceraOut])
+def list_mis_ventas(x_nit_empleado: str = Header(..., alias="X-NIT-Empleado")):
+    """
+    Ventas del empleado autenticado
+    """
+    nit = x_nit_empleado.strip()
+    if not nit:
+        raise HTTPException(status_code=400, detail="X-NIT-Empleado vacío")
+    return _ventas_cabecera_por_nit(nit)
+
+
+@router.get("/empleado/{nit_empleado}/todas", response_model=list[VentaCabeceraOut])
+def list_ventas_por_empleado_admin(
+    nit_empleado: str,
+    _: str = Depends(require_admin),
+):
+    """
+    todas las ventas de un empleado, solo lo accede el admin
+    """
+    nit = nit_empleado.strip()
+    return _ventas_cabecera_por_nit(nit)
 
 
 def _load_cabecera(cur, id_venta: int) -> dict | None:

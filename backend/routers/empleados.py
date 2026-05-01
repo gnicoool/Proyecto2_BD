@@ -2,7 +2,7 @@ import psycopg2
 from passlib.hash import bcrypt
 from fastapi import APIRouter, Depends, HTTPException, Query
 
-from auth_deps import require_admin
+from auth_deps import require_admin_nit
 from constants import ADMIN_ROLE_NAME
 from database import get_db
 from schemas.empleado import EmpleadoCreate, EmpleadoDelete, EmpleadoGet, EmpleadoUpdate
@@ -18,7 +18,7 @@ def _is_admin_role(nombre_rol: str | None) -> bool:
 
 @router.get("/", response_model=list[EmpleadoGet])
 def list_empleados(
-    _: str = Depends(require_admin),
+    _: str = Depends(require_admin_nit),
     include_inactive: bool = Query(False, description="Include deactivated users"),
 ):
     with get_db() as cur:
@@ -55,7 +55,7 @@ def list_empleados(
 @router.post("/", response_model=EmpleadoGet, status_code=201)
 def create_empleado(
     data: EmpleadoCreate,
-    _: str = Depends(require_admin),
+    _: str = Depends(require_admin_nit),
 ):
     pwd_hash = bcrypt.hash(data.contrasena)
     try:
@@ -113,7 +113,7 @@ def _rol_name_for_id(cur, id_rol: int) -> str | None:
 def update_empleado(
     nit_empleado: str,
     data: EmpleadoUpdate,
-    _: str = Depends(require_admin),
+    _: str = Depends(require_admin_nit),
 ):
     nit = nit_empleado.strip()
     payload = data.model_dump(exclude_unset=True)
@@ -165,7 +165,7 @@ def update_empleado(
 @router.delete("/{nit_empleado}", response_model=EmpleadoDelete)
 def delete_empleado(
     nit_empleado: str,
-    _: str = Depends(require_admin),
+    _: str = Depends(require_admin_nit),
 ):
     nit = nit_empleado.strip()
     with get_db() as cur:

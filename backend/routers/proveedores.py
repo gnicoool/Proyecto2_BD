@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 
-from auth_deps import require_admin
+from auth_deps import require_admin_nit
 from database import get_db
 from schemas.proveedor import ProveedorCreate, ProveedorDelete, ProveedorGet, ProveedorUpdate
 
@@ -9,7 +9,7 @@ router = APIRouter(prefix="/proveedores", tags=["Proveedores"])
 
 @router.get("/", response_model=list[ProveedorGet])
 def get_proveedores(
-    _: str = Depends(require_admin),
+    _: str = Depends(require_admin_nit),
     include_inactive: bool = Query(False, description="Include suppliers marked inactive"),
 ):
     with get_db() as cur:
@@ -42,7 +42,7 @@ def get_proveedores(
 @router.post("/", response_model=ProveedorGet, status_code=201)
 def create_proveedor(
     data: ProveedorCreate,
-    _: str = Depends(require_admin),
+    _: str = Depends(require_admin_nit),
 ):
     with get_db() as cur:
         cur.execute(
@@ -60,7 +60,7 @@ def create_proveedor(
 def update_proveedor(
     nit_proveedor: str,
     data: ProveedorUpdate,
-    _: str = Depends(require_admin),
+    _: str = Depends(require_admin_nit),
 ):
     nit = nit_proveedor.strip()
     payload = data.model_dump(exclude_unset=True)
@@ -94,7 +94,7 @@ def update_proveedor(
 @router.delete("/{nit_proveedor}", response_model=ProveedorDelete)
 def delete_proveedor(
     nit_proveedor: str,
-    _: str = Depends(require_admin),
+    _: str = Depends(require_admin_nit),
 ):
     nit = nit_proveedor.strip()
     with get_db() as cur:
