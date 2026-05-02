@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useState } from "react";
-import { Navigate } from "react-router-dom";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Link, Navigate, useSearchParams } from "react-router-dom";
 import { apiClient } from "../../lib/apiClient";
 import { ROUTES } from "../../lib/authRoutes";
 import { useAuth } from "../../hooks/useAuth";
@@ -18,8 +18,21 @@ function mapCabeceraToRow(v: VentaCabecera): VentaTablaRow {
   };
 }
 
+function parseEmpleadoVentasFilter(searchParams: URLSearchParams): {
+  nit: string | null;
+  nombreLabel: string | null;
+} {
+  const nit = searchParams.get("nit_empleado")?.trim() || null;
+  if (!nit) return { nit: null, nombreLabel: null };
+  const nombre = searchParams.get("nombre")?.trim() || null;
+  return { nit, nombreLabel: nombre };
+}
+
 export default function VentasPage() {
   const { user, isAdmin } = useAuth();
+  const [searchParams] = useSearchParams();
+  const filtroEmpleado = useMemo(() => parseEmpleadoVentasFilter(searchParams), [searchParams]);
+
   const [rows, setRows] = useState<VentaCabecera[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -51,6 +64,11 @@ export default function VentasPage() {
     return <Navigate to={ROUTES.misVentas} replace />;
   }
 
+  const rowsFiltradas = useMemo(() => {
+    if (!filtroEmpleado.nit) return rows;
+    return rows.filter((v) => (v.nit_empleado ?? "").trim() === filtroEmpleado.nit);
+  }, [rows, filtroEmpleado.nit]);
+
   return (
     <>
       <div className="relative mx-auto max-w-6xl px-4 pb-8">
@@ -61,19 +79,43 @@ export default function VentasPage() {
           cada venta.
         </p>
 
+        {filtroEmpleado.nit ? (
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-sky-200 bg-sky-50 px-4 py-3">
+            <p className="text-sm text-sky-900">
+              <span className="font-semibold">Filtro vendedor:</span>{" "}
+              {filtroEmpleado.nombreLabel || `NIT ${filtroEmpleado.nit}`}{" "}
+              <span className="font-mono text-xs text-sky-800">({filtroEmpleado.nit})</span>
+            </p>
+            <Link
+              to="/ventas"
+              className="text-sm font-semibold text-sky-800 underline decoration-sky-400 underline-offset-2 hover:text-sky-950"
+            >
+              Ver todas las ventas
+            </Link>
+          </div>
+        ) : null}
+
         {loading ? (
           <p className="text-sm text-neutral-600">Cargando ventas…</p>
         ) : error ? (
           <p className="text-sm text-red-600">{error}</p>
         ) : (
-          <VentasTable
-            rows={rows.map(mapCabeceraToRow)}
-            contraparteLabel="Cliente"
-            emptyMessage="No hay ventas registradas."
-            showEmpleadoColumn
-            empleadoColumnLabel="Vendedor"
-            onVerProductos={(id) => setModalVentaId(id)}
-          />
+          <div className="flex w-full justify-center">
+            <div className="w-full min-w-0">
+              <VentasTable
+                rows={rowsFiltradas.map(mapCabeceraToRow)}
+                contraparteLabel="Cliente"
+                emptyMessage={
+                  filtroEmpleado.nit
+                    ? "No hay ventas registradas para este vendedor."
+                    : "No hay ventas registradas."
+                }
+                showEmpleadoColumn
+                empleadoColumnLabel="Vendedor"
+                onVerProductos={(id) => setModalVentaId(id)}
+              />
+            </div>
+          </div>
         )}
       </div>
 

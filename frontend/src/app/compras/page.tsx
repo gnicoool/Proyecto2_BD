@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useState } from "react";
-import { Navigate } from "react-router-dom";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Link, Navigate, useSearchParams } from "react-router-dom";
 import { Plus } from "lucide-react";
 import { apiClient } from "../../lib/apiClient";
 import { adminNitHeaders } from "../../lib/adminHeaders";
@@ -20,8 +20,21 @@ function mapCompraToRow(c: CompraListaItem): VentaTablaRow {
   };
 }
 
+function parseProveedorComprasFilter(searchParams: URLSearchParams): {
+  nit: string | null;
+  nombreLabel: string | null;
+} {
+  const nit = searchParams.get("nit_proveedor")?.trim() || null;
+  if (!nit) return { nit: null, nombreLabel: null };
+  const nombre = searchParams.get("nombre")?.trim() || null;
+  return { nit, nombreLabel: nombre };
+}
+
 export default function ComprasPage() {
   const { user, isAdmin } = useAuth();
+  const [searchParams] = useSearchParams();
+  const filtroProveedor = useMemo(() => parseProveedorComprasFilter(searchParams), [searchParams]);
+
   const [rows, setRows] = useState<CompraListaItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -56,6 +69,11 @@ export default function ComprasPage() {
 
   const adminHeaders = adminNitHeaders(user.nit_empleado);
 
+  const rowsFiltradas = useMemo(() => {
+    if (!filtroProveedor.nit) return rows;
+    return rows.filter((r) => r.nit_proveedor === filtroProveedor.nit);
+  }, [rows, filtroProveedor.nit]);
+
   return (
     <>
       <div className="relative mx-auto max-w-6xl px-4 pb-28">
@@ -66,18 +84,42 @@ export default function ComprasPage() {
           una nueva compra (productos asociados al historial del proveedor seleccionado).
         </p>
 
+        {filtroProveedor.nit ? (
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3">
+            <p className="text-sm text-emerald-900">
+              <span className="font-semibold">Filtro proveedor:</span>{" "}
+              {filtroProveedor.nombreLabel || `NIT ${filtroProveedor.nit}`}{" "}
+              <span className="font-mono text-xs text-emerald-800">({filtroProveedor.nit})</span>
+            </p>
+            <Link
+              to="/compras"
+              className="text-sm font-semibold text-emerald-800 underline decoration-emerald-400 underline-offset-2 hover:text-emerald-950"
+            >
+              Ver todas las compras
+            </Link>
+          </div>
+        ) : null}
+
         {loading ? (
           <p className="text-sm text-neutral-600">Cargando compras…</p>
         ) : error ? (
           <p className="text-sm text-red-600">{error}</p>
         ) : (
-          <VentasTable
-            rows={rows.map(mapCompraToRow)}
-            contraparteLabel="Proveedor"
-            emptyMessage="No hay compras registradas."
-            verProductosLabel="Ver productos"
-            onVerProductos={(id) => setModalCompraId(id)}
-          />
+          <div className="flex w-full justify-center">
+            <div className="w-full min-w-0">
+              <VentasTable
+                rows={rowsFiltradas.map(mapCompraToRow)}
+                contraparteLabel="Proveedor"
+                emptyMessage={
+                  filtroProveedor.nit
+                    ? "No hay compras registradas para este proveedor."
+                    : "No hay compras registradas."
+                }
+                verProductosLabel="Ver productos"
+                onVerProductos={(id) => setModalCompraId(id)}
+              />
+            </div>
+          </div>
         )}
       </div>
 

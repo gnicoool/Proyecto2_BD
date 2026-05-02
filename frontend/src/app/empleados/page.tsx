@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Plus } from "lucide-react";
 import { PersonasTable, type PersonaRow } from "../../components/personas/tablepersona";
 import { NuevoEmpleadoModal } from "../../components/modal/NuevaPersona/empleado/NuevoEmpleadoModal";
@@ -19,6 +20,7 @@ function mapEmpleado(e: EmpleadoListItem): PersonaRow {
 }
 
 export default function EmpleadosPage() {
+  const navigate = useNavigate();
   const { user } = useAuth();
   const [items, setItems] = useState<EmpleadoListItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -82,8 +84,17 @@ export default function EmpleadosPage() {
 
   const modalOpen = createOpen || editEmpleado !== null;
 
+  const verVentasEmpleado = (nit: string) => {
+    const e = items.find((x) => x.nit_empleado === nit);
+    const params = new URLSearchParams({
+      nit_empleado: nit,
+      nombre: e?.nombre ?? "",
+    });
+    navigate(`/ventas?${params.toString()}`);
+  };
+
   return (
-    <div className="max-w-6xl">
+    <div className="mx-auto w-full max-w-6xl px-4 pb-10">
       <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="mb-2 font-sans text-2xl font-bold text-neutral-950">Empleados</h1>
@@ -117,17 +128,17 @@ export default function EmpleadosPage() {
       ) : error ? (
         <p className="text-sm text-red-600">{error}</p>
       ) : (
-        <PersonasTable
-          data={rows}
-          tipo="empleado"
-          onView={(nit) => {
-            window.alert(
-              `Ventas del empleado NIT ${nit}: puedes consultar GET /ventas/empleado/{nit}/todas como admin (UI próxima).`,
-            );
-          }}
-          onEdit={openEdit}
-          onDelete={handleDelete}
-        />
+        <div className="flex w-full justify-center">
+          <div className="w-full min-w-0">
+            <PersonasTable
+              data={rows}
+              tipo="empleado"
+              onView={verVentasEmpleado}
+              onEdit={openEdit}
+              onDelete={handleDelete}
+            />
+          </div>
+        </div>
       )}
     </div>
   );

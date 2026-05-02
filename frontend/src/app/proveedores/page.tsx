@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Plus } from "lucide-react";
 import { PersonasTable, type PersonaRow } from "../../components/personas/tablepersona";
 import { NuevoProveedorModal } from "../../components/modal/NuevaPersona/proveedor/NuevoProveedorModal";
@@ -19,6 +20,7 @@ function mapProveedor(p: ProveedorListItem): PersonaRow {
 }
 
 export default function ProveedoresPage() {
+  const navigate = useNavigate();
   const { user } = useAuth();
   const [items, setItems] = useState<ProveedorListItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -82,8 +84,17 @@ export default function ProveedoresPage() {
 
   const modalOpen = createOpen || editProveedor !== null;
 
+  const verComprasProveedor = (nit: string) => {
+    const p = items.find((x) => x.nit_proveedor === nit);
+    const params = new URLSearchParams({
+      nit_proveedor: nit,
+      nombre: p?.nombre ?? "",
+    });
+    navigate(`/compras?${params.toString()}`);
+  };
+
   return (
-    <div className="max-w-6xl">
+    <div className="mx-auto w-full max-w-6xl px-4 pb-10">
       <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="mb-2 font-sans text-2xl font-bold text-neutral-950">Proveedores</h1>
@@ -117,17 +128,17 @@ export default function ProveedoresPage() {
       ) : error ? (
         <p className="text-sm text-red-600">{error}</p>
       ) : (
-        <PersonasTable
-          data={rows}
-          tipo="proveedor"
-          onView={(nit) => {
-            window.alert(
-              `Compras del proveedor NIT ${nit}: revisa informes o el módulo de compras (vista en construcción).`,
-            );
-          }}
-          onEdit={openEdit}
-          onDelete={handleDelete}
-        />
+        <div className="flex w-full justify-center">
+          <div className="w-full min-w-0">
+            <PersonasTable
+              data={rows}
+              tipo="proveedor"
+              onView={verComprasProveedor}
+              onEdit={openEdit}
+              onDelete={handleDelete}
+            />
+          </div>
+        </div>
       )}
     </div>
   );
