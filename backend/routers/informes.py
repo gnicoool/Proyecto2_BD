@@ -1,11 +1,14 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter
 
 from database import get_db
 from schemas.informes import (
+    CompraPorMesOut,
     ProductoCatalogoVistaOut,
     ProductoNuncaVendidoOut,
+    TopProductoVendidoOut,
     UltimaLineaVentaOut,
     VentaPorCategoriaOut,
+    VentaPorEmpleadoOut,
     VentaPorMesSubqueryOut,
 )
 
@@ -36,11 +39,11 @@ def ventas_por_categoria():
     with get_db() as cur:
         cur.execute(
             """
-            WITH lineas_importe AS (
+            WITH lineas_costo AS (
                 SELECT
                     vp.id_venta,
                     p.id_categoria,
-                    (vp.cantidad_venta * p.precio_venta)::numeric AS importe_linea
+                    (vp.cantidad_venta * p.precio_venta)::numeric AS costo_linea
                 FROM Venta_Producto vp
                 INNER JOIN Producto p ON p.id_producto = vp.id_producto
             )
@@ -48,13 +51,13 @@ def ventas_por_categoria():
                 c.id_categoria,
                 c.nombre AS categoria_nombre,
                 COUNT(DISTINCT l.id_venta)::int AS num_ventas,
-                SUM(l.importe_linea) AS total_importe,
-                (SUM(l.importe_linea) / NULLIF(COUNT(DISTINCT l.id_venta), 0)) AS ticket_promedio_categoria
-            FROM lineas_importe l
+                SUM(l.costo_linea) AS costo_total,
+                (SUM(l.costo_linea) / NULLIF(COUNT(DISTINCT l.id_venta), 0)) AS factura_promedio_categoria
+            FROM lineas_costo l
             INNER JOIN Categoria c ON c.id_categoria = l.id_categoria
             GROUP BY c.id_categoria, c.nombre
-            HAVING SUM(l.importe_linea) > 0
-            ORDER BY total_importe DESC
+            HAVING SUM(l.costo_linea) > 0
+            ORDER BY costo_total DESC
             """
         )
         return cur.fetchall()
@@ -121,7 +124,68 @@ def ultimas_lineas_venta():
             LIMIT 80
             """
         )
-        rows = cur.fetchall()
-    if not rows:
-        raise HTTPException(status_code=404, detail="No hay líneas de venta")
-    return rows
+        return cur.fetchall()
+
+
+@router.get("/top-productos-vendidos", response_model=list[TopProductoVendidoOut])
+def top_productos_vendidos():
+    """Productos mejores vendidos"""
+    with get_db() as cur:
+        cur.execute(
+            """
+            SELECT
+                p.id_producto,
+                p.nombre,
+                SUM(vp.cantidad_venta)::int AS total_unidades_vendidas,
+                SUM(vp.cantidad_venta * p.precio_venta)::numeric AS costo_aproximado
+            FROM Venta_Producto vp
+            INNER JOIN Producto p ON p.id_producto = vp.id_producto
+            GROUP BY p.id_producto, p.nombre
+            ORDER BY total_unidades_vendidas DESC
+            LIMIT 25
+            """
+        )
+        return cur.fetchall()
+
+
+@router.get("/compras-por-mes", response_model=list[CompraPorMesOut])
+def compras_por_mes():
+    """TCompras por mes """
+    with get_db() as cur:
+        cur.execute(
+            """
+            SELECT sub.anio_mes, sub.num_compras, sub.total_mes
+            FROM (
+                SELECT
+                    TO_CHAR(c.fecha, 'YYYY-MM') AS anio_mes,
+                    COUNT(*)::int AS num_compras,
+                    SUM(c.total)::numeric AS total_mes
+                FROM Compra c
+                GROUP BY TO_CHAR(c.fecha, 'YYYY-MM')
+            ) sub
+            WHERE sub.num_compras > 0
+            ORDER BY sub.anio_mes DESC
+            """
+        )
+        return cur.fetchall()
+
+
+@router.get("/ventas-por-empleado", response_model=list[VentaPorEmpleadoOut])
+def ventas_por_empleado():
+    """numero de ventas por empleado"""
+    with get_db() as cur:
+        cur.execute(
+            """
+            SELECT
+                v.nit_empleado,
+                u.nombre AS empleado_nombre,
+                COUNT(*)::int AS num_ventas,
+                SUM(v.total)::numeric AS costo_total
+            FROM Venta v
+            LEFT JOIN Usuario u ON u.nit_empleado = v.nit_empleado
+            GROUP BY v.nit_empleado, u.nombre
+            HAVING COUNT(*) > 0
+            ORDER BY costo_total DESC NULLS LAST
+            """
+        )
+        return cur.fetchall()

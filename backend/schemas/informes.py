@@ -18,8 +18,8 @@ class VentaPorCategoriaOut(BaseModel):
     id_categoria: int
     categoria_nombre: str
     num_ventas: int
-    total_importe: Decimal
-    ticket_promedio_categoria: Decimal | None
+    costo_total: Decimal
+    factura_promedio_categoria: Decimal | None
 
 class ProductoNuncaVendidoOut(BaseModel):
     id_producto: int
@@ -38,3 +38,23 @@ class UltimaLineaVentaOut(BaseModel):
     producto: str
     cantidad_venta: int
     precio_venta: Decimal
+
+
+class TopProductoVendidoOut(BaseModel):
+    id_producto: int
+    nombre: str
+    total_unidades_vendidas: int
+    costo_aproximado: Decimal
+
+
+class CompraPorMesOut(BaseModel):
+    anio_mes: str
+    num_compras: int
+    total_mes: Decimal
+
+
+class VentaPorEmpleadoOut(BaseModel):
+    nit_empleado: str | None
+    empleado_nombre: str | None
+    num_ventas: int
+    costo_total: Decimal
