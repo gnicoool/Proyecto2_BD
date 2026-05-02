@@ -7,7 +7,6 @@ export type FormNuevoProveedorProps = {
   onClose: () => void;
   onSuccess?: () => void;
   requestHeaders?: HeadersInit;
-  /** When set, PATCH this supplier. When null, POST new. */
   initial: ProveedorListItem | null;
 };
 

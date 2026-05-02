@@ -8,7 +8,6 @@ export type FormNuevoEmpleadoProps = {
   onClose: () => void;
   onSuccess?: () => void;
   requestHeaders?: HeadersInit;
-  /** When set, form edits this employee (PATCH). When null, creates new (POST). */
   initial: EmpleadoListItem | null;
 };
 
