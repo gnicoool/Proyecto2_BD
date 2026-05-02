@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Link, useSearchParams } from "react-router-dom";
 import { ProductoCard } from "../../components/producto/ProductoCard";
 import { ProductoDetalle, type Producto } from "../../components/producto/ProductoDetalle";
 import { FloatingButton } from "../../components/Layout/botonflotante";
@@ -45,6 +46,23 @@ function mapProductos(rows: ProductoApi[], marcasById: Map<number, string>): Pro
   }));
 }
 
+function parseCategoriaFilter(searchParams: URLSearchParams): {
+  id: number | null;
+  nombreLabel: string | null;
+} {
+  const rawId = searchParams.get("id_categoria");
+  const nombre = searchParams.get("nombre");
+  if (!rawId) {
+    return { id: null, nombreLabel: null };
+  }
+  const id = Number.parseInt(rawId, 10);
+  if (!Number.isFinite(id) || id < 1) {
+    return { id: null, nombreLabel: null };
+  }
+  const nombreLabel = nombre?.trim() ? nombre.trim() : null;
+  return { id, nombreLabel };
+}
+
 function ProductoGrid({ productos }: { productos: Producto[] }) {
   const [selected, setSelected] = useState<Producto | null>(null);
 
@@ -63,6 +81,9 @@ function ProductoGrid({ productos }: { productos: Producto[] }) {
 
 export default function ProductosPage() {
   const { user } = useAuth();
+  const [searchParams] = useSearchParams();
+  const filtroCategoria = useMemo(() => parseCategoriaFilter(searchParams), [searchParams]);
+
   const [productos, setProductos] = useState<Producto[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -74,7 +95,11 @@ export default function ProductosPage() {
     setError(null);
     setLoading(true);
     try {
-      const prodRows = await apiClient.get<ProductoApi[]>("/productos/");
+      const path =
+        filtroCategoria.id != null
+          ? `/productos/categoria/${filtroCategoria.id}`
+          : "/productos/";
+      const prodRows = await apiClient.get<ProductoApi[]>(path);
       let marcasById = new Map<number, string>();
       try {
         const marcaRows = await apiClient.get<MarcaApi[]>("/marcas/");
@@ -89,7 +114,7 @@ export default function ProductosPage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [filtroCategoria.id]);
 
   useEffect(() => {
     void loadProductos();
@@ -106,10 +131,29 @@ export default function ProductosPage() {
       <div className="relative mx-auto max-w-[90rem] px-4 pb-28">
         <h1 className="mb-6 font-sans text-2xl font-bold text-[#0a0a0a]">Productos</h1>
 
+        {filtroCategoria.id != null ? (
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-sky-200 bg-sky-50 px-4 py-3">
+            <p className="font-sans text-sm text-sky-900">
+              <span className="font-semibold">Filtro:</span>{" "}
+              {filtroCategoria.nombreLabel?.trim() || `Categoría #${filtroCategoria.id}`}
+            </p>
+            <Link
+              to="/productos"
+              className="font-sans text-sm font-semibold text-sky-700 underline decoration-sky-400 underline-offset-2 hover:text-sky-900"
+            >
+              Ver todos los productos
+            </Link>
+          </div>
+        ) : null}
+
         {error ? (
           <p className="font-sans text-[0.9375rem] text-red-600">{error}</p>
         ) : productos.length === 0 ? (
-          <p className="font-sans text-[0.9375rem] text-[#555]">No hay productos registrados.</p>
+          <p className="font-sans text-[0.9375rem] text-[#555]">
+            {filtroCategoria.id != null
+              ? "No hay productos en esta categoría."
+              : "No hay productos registrados."}
+          </p>
         ) : (
           <ProductoGrid productos={productos} />
         )}
