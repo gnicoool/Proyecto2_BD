@@ -1,21 +1,125 @@
 from fastapi import APIRouter, HTTPException
+
 from database import get_db
-from schemas.compra import CompraCreate, CompraGet
+from schemas.compra import (
+    CompraCabeceraListaOut,
+    CompraCreate,
+    CompraDetalleOut,
+    CompraGet,
+    CompraLineaOut,
+)
+from schemas.producto import ProductoGet
 
 router = APIRouter(prefix="/compras", tags=["Compras"])
 
 
-@router.get("/", response_model=list[CompraGet])
+@router.get("/", response_model=list[CompraCabeceraListaOut])
 def list_compras():
     with get_db() as cur:
         cur.execute(
             """
-            SELECT id_compra, fecha, total, nit_proveedor
-            FROM Compra
-            ORDER BY id_compra DESC
+            SELECT
+                c.id_compra,
+                c.fecha,
+                c.total,
+                c.nit_proveedor,
+                p.nombre AS proveedor_nombre
+            FROM Compra c
+            JOIN Proveedor p ON p.nit_proveedor = c.nit_proveedor
+            ORDER BY c.id_compra DESC
             """
         )
         return cur.fetchall()
+
+
+@router.get(
+    "/productos-por-proveedor/{nit_proveedor}",
+    response_model=list[ProductoGet],
+)
+def productos_por_proveedor(nit_proveedor: str):
+    """
+    Active products that have been purchased from this supplier before
+    (distinct). If none, returns all active products so the first purchase
+    to a supplier is still possible.
+    """
+    nit = nit_proveedor.strip()
+    with get_db() as cur:
+        cur.execute(
+            "SELECT 1 FROM Proveedor WHERE nit_proveedor = %s",
+            (nit,),
+        )
+        if not cur.fetchone():
+            raise HTTPException(status_code=404, detail="Proveedor no encontrado")
+        cur.execute(
+            """
+            SELECT DISTINCT pr.*
+            FROM Producto pr
+            INNER JOIN Compra_Producto cp ON cp.id_producto = pr.id_producto
+            INNER JOIN Compra c
+                ON c.id_compra = cp.id_compra AND c.nit_proveedor = %s
+            WHERE pr.activo = true
+            ORDER BY pr.id_producto
+            """,
+            (nit,),
+        )
+        rows = cur.fetchall()
+        if rows:
+            return rows
+        cur.execute(
+            "SELECT * FROM Producto WHERE activo = true ORDER BY id_producto"
+        )
+        return cur.fetchall()
+
+
+@router.get("/{id_compra}/detalle", response_model=CompraDetalleOut)
+def get_compra_detalle(id_compra: int):
+    with get_db() as cur:
+        cur.execute(
+            """
+            SELECT
+                c.id_compra,
+                c.fecha,
+                c.total,
+                c.nit_proveedor,
+                p.nombre AS proveedor_nombre
+            FROM Compra c
+            JOIN Proveedor p ON p.nit_proveedor = c.nit_proveedor
+            WHERE c.id_compra = %s
+            """,
+            (id_compra,),
+        )
+        cab = cur.fetchone()
+        if not cab:
+            raise HTTPException(status_code=404, detail="Compra no encontrada")
+        cur.execute(
+            """
+            SELECT
+                cp.id_producto,
+                cp.cantidad_compra,
+                pr.precio_compra,
+                pr.nombre
+            FROM Compra_Producto cp
+            JOIN Producto pr ON pr.id_producto = cp.id_producto
+            WHERE cp.id_compra = %s
+            ORDER BY cp.id_producto
+            """,
+            (id_compra,),
+        )
+        line_rows = cur.fetchall()
+
+    lineas = [
+        CompraLineaOut(
+            id_producto=r["id_producto"],
+            cantidad_compra=r["cantidad_compra"],
+            precio_compra=r["precio_compra"],
+            nombre=r["nombre"],
+        )
+        for r in line_rows
+    ]
+    return CompraDetalleOut(
+        compra=CompraCabeceraListaOut(**cab),
+        lineas=lineas,
+    )
 
 
 @router.get("/{id_compra}", response_model=CompraGet)

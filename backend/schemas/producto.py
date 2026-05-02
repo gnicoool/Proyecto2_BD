@@ -21,6 +21,8 @@ class ProductoGet(BaseModel):
     id_categoria: int
     activo: bool
     id_marca: int
+    categoria_nombre: Optional[str] = None
+    proveedor_nombre: Optional[str] = None
 
 class ProductoUpdate(BaseModel):
     nombre: Optional[str]= None

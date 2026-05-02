@@ -3,7 +3,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 import database
-from routers import categorias, productos, empleados, proveedores, ventas, compras, informes, auth, clientes
+from routers import categorias, marcas, productos, empleados, proveedores, ventas, compras, informes, auth, clientes
 
 
 @asynccontextmanager
@@ -23,6 +23,7 @@ app.add_middleware(
 )
 
 app.include_router(categorias.router)
+app.include_router(marcas.router)
 app.include_router(productos.router)
 app.include_router(empleados.router)
 app.include_router(clientes.router)

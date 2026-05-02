@@ -9,7 +9,34 @@ router = APIRouter(prefix="/productos", tags=["Productos"])
 @router.get("/", response_model=list[ProductoGet])
 def get_productos():
     with get_db() as cur:
-        cur.execute("SELECT * FROM Producto ORDER BY id_producto")
+        cur.execute(
+            """
+            SELECT
+                pr.id_producto,
+                pr.nombre,
+                pr.descripcion,
+                pr.precio_venta,
+                pr.precio_compra,
+                pr.cant_disponible,
+                pr.id_categoria,
+                pr.activo,
+                pr.id_marca,
+                cat.nombre AS categoria_nombre,
+                lp.proveedor_nombre
+            FROM Producto pr
+            INNER JOIN Categoria cat ON cat.id_categoria = pr.id_categoria
+            LEFT JOIN LATERAL (
+                SELECT p.nombre AS proveedor_nombre
+                FROM Compra_Producto cp
+                INNER JOIN Compra c ON c.id_compra = cp.id_compra
+                INNER JOIN Proveedor p ON p.nit_proveedor = c.nit_proveedor
+                WHERE cp.id_producto = pr.id_producto
+                ORDER BY c.fecha DESC NULLS LAST, c.id_compra DESC
+                LIMIT 1
+            ) lp ON true
+            ORDER BY pr.id_producto
+            """
+        )
         return cur.fetchall()
 
 
