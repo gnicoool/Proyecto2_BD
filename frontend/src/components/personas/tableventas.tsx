@@ -24,6 +24,9 @@ type Props = {
   emptyMessage?: string;
   onVerProductos: (id: number) => void;
   verProductosLabel?: string;
+  /** Show vendedor column (all-sales admin view) */
+  showEmpleadoColumn?: boolean;
+  empleadoColumnLabel?: string;
 };
 
 export function VentasTable({
@@ -32,6 +35,8 @@ export function VentasTable({
   emptyMessage = "No hay registros.",
   onVerProductos,
   verProductosLabel = "Ver productos",
+  showEmpleadoColumn = false,
+  empleadoColumnLabel = "Vendedor",
 }: Props) {
   if (rows.length === 0) {
     return (
@@ -49,6 +54,9 @@ export function VentasTable({
             <th className="px-3 py-2 font-semibold">ID</th>
             <th className="px-3 py-2 font-semibold">Fecha</th>
             <th className="px-3 py-2 font-semibold">{contraparteLabel}</th>
+            {showEmpleadoColumn ? (
+              <th className="px-3 py-2 font-semibold">{empleadoColumnLabel}</th>
+            ) : null}
             <th className="px-3 py-2 font-semibold">Total</th>
             <th className="px-3 py-2 text-center font-semibold">{verProductosLabel}</th>
           </tr>
@@ -62,6 +70,16 @@ export function VentasTable({
               <td className="px-3 py-2 tabular-nums">{v.id}</td>
               <td className="px-3 py-2 whitespace-nowrap">{formatFechaVenta(v.fecha)}</td>
               <td className="px-3 py-2">{v.contraparte ?? "—"}</td>
+              {showEmpleadoColumn ? (
+                <td className="max-w-[200px] px-3 py-2">
+                  <div className="font-medium text-neutral-900">
+                    {v.empleadoNombre?.trim() || "—"}
+                  </div>
+                  {v.nitEmpleado ? (
+                    <div className="font-mono text-xs text-neutral-500">{v.nitEmpleado}</div>
+                  ) : null}
+                </td>
+              ) : null}
               <td className="px-3 py-2 tabular-nums">Q {formatMonto(v.total)}</td>
               <td className="px-3 py-2 text-center">
                 <button

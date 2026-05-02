@@ -71,6 +71,12 @@ export function Navbar() {
             <NavLink to={ROUTES.empleados} className={({ isActive }) => tabClass(isActive)}>
               Empleados
             </NavLink>
+            <NavLink to={ROUTES.compras} className={({ isActive }) => tabClass(isActive)}>
+              Compras
+            </NavLink>
+            <NavLink to={ROUTES.ventas} className={({ isActive }) => tabClass(isActive)}>
+              Ventas
+            </NavLink>
             <NavLink to={ROUTES.informes} className={({ isActive }) => tabClass(isActive)}>
               Informes
             </NavLink>

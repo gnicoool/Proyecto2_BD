@@ -28,4 +28,7 @@ export type VentaTablaRow = {
   total: number | string;
   /** Cliente, proveedor, etc. */
   contraparte: string | null;
+  /** Admin list: salesperson name / fallback NIT */
+  empleadoNombre?: string | null;
+  nitEmpleado?: string | null;
 };

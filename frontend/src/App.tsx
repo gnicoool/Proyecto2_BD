@@ -11,6 +11,8 @@ import InformesPage from "./app/informes/page";
 import MisVentasPage from "./app/mis_ventas/page";
 import ProductosPage from "./app/productos/page";
 import ProveedoresPage from "./app/proveedores/page";
+import ComprasPage from "./app/compras/page";
+import VentasPage from "./app/ventas/page";
 
 export default function App() {
   return (
@@ -27,6 +29,8 @@ export default function App() {
               <Route path="productos" element={<ProductosPage />} />
               <Route path="proveedores" element={<ProveedoresPage />} />
               <Route path="empleados" element={<EmpleadosPage />} />
+              <Route path="compras" element={<ComprasPage />} />
+              <Route path="ventas" element={<VentasPage />} />
               <Route path="informes" element={<InformesPage />} />
             </Route>
           </Route>
