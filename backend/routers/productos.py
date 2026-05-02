@@ -22,7 +22,7 @@ def get_productos():
                 pr.activo,
                 pr.id_marca,
                 cat.nombre AS categoria_nombre,
-                lp.proveedor_nombre
+                COALESCE(lp_compra.proveedor_nombre, lp_link.proveedor_nombre) AS proveedor_nombre
             FROM Producto pr
             INNER JOIN Categoria cat ON cat.id_categoria = pr.id_categoria
             LEFT JOIN LATERAL (
@@ -33,7 +33,15 @@ def get_productos():
                 WHERE cp.id_producto = pr.id_producto
                 ORDER BY c.fecha DESC NULLS LAST, c.id_compra DESC
                 LIMIT 1
-            ) lp ON true
+            ) lp_compra ON true
+            LEFT JOIN LATERAL (
+                SELECT p.nombre AS proveedor_nombre
+                FROM Producto_Proveedor ppx
+                INNER JOIN Proveedor p ON p.nit_proveedor = ppx.nit_proveedor
+                WHERE ppx.id_producto = pr.id_producto
+                ORDER BY ppx.nit_proveedor
+                LIMIT 1
+            ) lp_link ON true
             ORDER BY pr.id_producto
             """
         )
@@ -61,7 +69,19 @@ def get_productos_by_marca(id_marca: int):
 
 @router.post("/", response_model=ProductoGet, status_code=201)
 def create_producto(data: ProductoCreate):
+    nit = (data.nit_proveedor or "").strip() or None
     with get_db() as cur:
+        if nit:
+            cur.execute(
+                "SELECT nit_proveedor, activo FROM Proveedor WHERE nit_proveedor = %s",
+                (nit,),
+            )
+            prov = cur.fetchone()
+            if not prov:
+                raise HTTPException(status_code=404, detail="Proveedor no encontrado")
+            if not prov["activo"]:
+                raise HTTPException(status_code=400, detail="Proveedor inactivo")
+
         cur.execute(
             """INSERT INTO Producto (nombre, descripcion, precio_venta, precio_compra, cant_disponible, id_categoria, id_marca)
                VALUES (%s, %s, %s, %s, %s, %s, %s) RETURNING *""",
@@ -75,7 +95,20 @@ def create_producto(data: ProductoCreate):
                 data.id_marca,
             ),
         )
-        return cur.fetchone()
+        row = cur.fetchone()
+        id_producto = row["id_producto"]
+
+        if nit:
+            cur.execute(
+                """
+                INSERT INTO Producto_Proveedor (id_producto, nit_proveedor)
+                VALUES (%s, %s)
+                ON CONFLICT (id_producto, nit_proveedor) DO NOTHING
+                """,
+                (id_producto, nit),
+            )
+
+        return row
 
 
 @router.patch("/{id_producto}", response_model=ProductoGet)

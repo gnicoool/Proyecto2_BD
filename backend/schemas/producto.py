@@ -10,6 +10,8 @@ class ProductoCreate(BaseModel):
     cant_disponible: int = 0
     id_categoria: int
     id_marca: int
+    # Links product to supplier for compras UI when no purchase history exists yet.
+    nit_proveedor: Optional[str] = None
 
 class ProductoGet(BaseModel):
     id_producto: int

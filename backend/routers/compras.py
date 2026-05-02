@@ -38,9 +38,8 @@ def list_compras():
 )
 def productos_por_proveedor(nit_proveedor: str):
     """
-    Active products that have been purchased from this supplier before
-    (distinct). If none, returns all active products so the first purchase
-    to a supplier is still possible.
+    Active products available for this supplier: purchase history, explicit Producto_Proveedor
+    link (e.g. set when creating a product), or all products if the supplier has no compras yet.
     """
     nit = nit_proveedor.strip()
     with get_db() as cur:
@@ -54,19 +53,27 @@ def productos_por_proveedor(nit_proveedor: str):
             """
             SELECT DISTINCT pr.*
             FROM Producto pr
-            INNER JOIN Compra_Producto cp ON cp.id_producto = pr.id_producto
-            INNER JOIN Compra c
-                ON c.id_compra = cp.id_compra AND c.nit_proveedor = %s
             WHERE pr.activo = true
+              AND (
+                EXISTS (
+                    SELECT 1
+                    FROM Compra_Producto cp
+                    INNER JOIN Compra c
+                        ON c.id_compra = cp.id_compra AND c.nit_proveedor = %s
+                    WHERE cp.id_producto = pr.id_producto
+                )
+                OR EXISTS (
+                    SELECT 1
+                    FROM Producto_Proveedor ppr
+                    WHERE ppr.id_producto = pr.id_producto AND ppr.nit_proveedor = %s
+                )
+                OR NOT EXISTS (
+                    SELECT 1 FROM Compra c WHERE c.nit_proveedor = %s
+                )
+              )
             ORDER BY pr.id_producto
             """,
-            (nit,),
-        )
-        rows = cur.fetchall()
-        if rows:
-            return rows
-        cur.execute(
-            "SELECT * FROM Producto WHERE activo = true ORDER BY id_producto"
+            (nit, nit, nit),
         )
         return cur.fetchall()
 

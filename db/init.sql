@@ -6,6 +6,7 @@ DROP TABLE IF EXISTS Venta_Producto;
 DROP TABLE IF EXISTS Venta;
 DROP TABLE IF EXISTS Compra_Producto;
 DROP TABLE IF EXISTS Compra;
+DROP TABLE IF EXISTS Producto_Proveedor;
 DROP TABLE IF EXISTS Producto;
 DROP TABLE IF EXISTS Categoria;
 DROP TABLE IF EXISTS Cliente;
@@ -55,6 +56,14 @@ CREATE TABLE Proveedor(
     correo VARCHAR(50) not null,
     tel_proveedor VARCHAR(20) not null,
     activo boolean not null default true
+);
+
+CREATE TABLE Producto_Proveedor(
+    id_producto INT NOT NULL,
+    nit_proveedor VARCHAR(8) NOT NULL,
+    PRIMARY KEY (id_producto, nit_proveedor),
+    FOREIGN KEY (id_producto) REFERENCES Producto(id_producto) ON DELETE CASCADE,
+    FOREIGN KEY (nit_proveedor) REFERENCES Proveedor(nit_proveedor) ON DELETE CASCADE
 );
 
 CREATE TABLE Compra(
