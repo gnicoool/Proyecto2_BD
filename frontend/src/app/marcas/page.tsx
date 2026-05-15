@@ -14,11 +14,10 @@ export default function MarcasPage() {
   const [nuevaOpen, setNuevaOpen] = useState(false);
 
   const loadMarcas = useCallback(async () => {
-    setError(null);
-    setLoading(true);
     try {
       const data = await apiClient.get<Marca[]>("/marcas");
       setMarcas(data);
+      setError(null);
     } catch (e) {
       setError(e instanceof Error ? e.message : "No se pudieron cargar las marcas.");
       setMarcas([]);
@@ -28,7 +27,15 @@ export default function MarcasPage() {
   }, []);
 
   useEffect(() => {
-    void loadMarcas();
+    let isMounted = true;
+    const fetchAll = async() => {
+      if(isMounted) setLoading(true);
+      await loadMarcas();
+    };
+    void fetchAll();
+    return () => {
+      isMounted = false;
+    }
   }, [loadMarcas]);
 
   if (loading) {

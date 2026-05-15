@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Eye, EyeOff } from "lucide-react";
 import { apiClient } from "../../../../lib/apiClient";
 import { Field, INPUT_CLASS } from "../personaModalShared";
@@ -65,13 +65,6 @@ export function FormNuevoEmpleado({
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [created, setCreated] = useState<{ nombre: string; contrasena: string } | null>(null);
-
-  useEffect(() => {
-    setErr(null);
-    setCreated(null);
-    setShowPass(false);
-    setForm(initial ? formFromInitial(initial) : emptyForm());
-  }, [initial]);
 
   const set =
     (k: keyof FormState) => (e: React.ChangeEvent<HTMLInputElement>) =>

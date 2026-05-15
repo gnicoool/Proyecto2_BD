@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { apiClient } from "../../../../lib/apiClient";
 import { Field, INPUT_CLASS } from "../personaModalShared";
 import type { ProveedorListItem } from "../../../../types/proveedor";
@@ -45,11 +45,6 @@ export function FormNuevoProveedor({
   );
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
-
-  useEffect(() => {
-    setErr(null);
-    setForm(initial ? formFromInitial(initial) : emptyForm());
-  }, [initial]);
 
   const set =
     (k: keyof FormState) => (e: React.ChangeEvent<HTMLInputElement>) =>

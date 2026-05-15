@@ -57,8 +57,6 @@ export function FormNuevaVenta({ formId, nitEmpleado, onClose, onCreated }: Form
   );
 
   const loadCatalogo = useCallback(async () => {
-    setLoadErr(null);
-    setLoadingCatalogo(true);
     try {
       const [prods, clis] = await Promise.all([
         apiClient.get<ProductoListItem[]>("/productos/"),
@@ -66,6 +64,7 @@ export function FormNuevaVenta({ formId, nitEmpleado, onClose, onCreated }: Form
       ]);
       setProductos(prods);
       setClientes(clis);
+      setLoadErr(null);
     } catch (e) {
       const msg = e instanceof Error ? e.message : "No se pudo cargar el catálogo";
       setLoadErr(
@@ -79,7 +78,15 @@ export function FormNuevaVenta({ formId, nitEmpleado, onClose, onCreated }: Form
   }, []);
 
   useEffect(() => {
-    void loadCatalogo();
+    let isMounted = true;
+    const fetchAll = async() => {
+      if(isMounted) setLoadingCatalogo(true);
+      await loadCatalogo();
+    };
+    void fetchAll();
+    return () => {
+      isMounted = false;
+    }
   }, [loadCatalogo]);
 
   useEffect(() => {

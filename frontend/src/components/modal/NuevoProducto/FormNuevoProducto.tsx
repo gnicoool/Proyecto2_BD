@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Field, INPUT_CLASS } from "../NuevaPersona/personaModalShared";
 import { apiClient } from "../../../lib/apiClient";
 import type { ProveedorListItem } from "../../../types/proveedor";
@@ -29,26 +29,18 @@ const EMPTY: FormState = {
 };
 
 type Props = {
-  open: boolean;
   onClose: () => void;
   onSuccess?: () => void;
   requestHeaders?: HeadersInit;
 };
 
-export function FormNuevoProducto({ open, onClose, onSuccess, requestHeaders }: Props) {
+export function FormNuevoProducto({ onClose, onSuccess, requestHeaders }: Props) {
   const [form, setForm] = useState<FormState>(EMPTY);
   const [categorias, setCategorias] = useState<CategoriaOpt[]>([]);
   const [marcas, setMarcas] = useState<MarcaOpt[]>([]);
   const [proveedores, setProveedores] = useState<ProveedorListItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (open) {
-      setForm(EMPTY);
-      setErr(null);
-    }
-  }, [open]);
 
   useEffect(() => {
     let cancelled = false;

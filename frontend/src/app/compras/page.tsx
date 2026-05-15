@@ -41,12 +41,16 @@ export default function ComprasPage() {
   const [modalCompraId, setModalCompraId] = useState<number | null>(null);
   const [nuevaOpen, setNuevaOpen] = useState(false);
 
+  const rowsFiltradas = useMemo(() => {
+    if (!filtroProveedor.nit) return rows;
+    return rows.filter((r) => r.nit_proveedor === filtroProveedor.nit);
+  }, [rows, filtroProveedor.nit]);
+
   const loadCompras = useCallback(async () => {
-    setError(null);
-    setLoading(true);
     try {
       const data = await apiClient.get<CompraListaItem[]>("/compras/");
       setRows(data);
+      setError(null);
     } catch (e) {
       setError(e instanceof Error ? e.message : "No se pudieron cargar las compras");
       setRows([]);
@@ -56,7 +60,15 @@ export default function ComprasPage() {
   }, []);
 
   useEffect(() => {
-    void loadCompras();
+    let isMounted = true;
+    const fetchAll = async() => {
+      if(isMounted) setLoading(true);
+      await loadCompras();
+    }
+    void fetchAll();
+    return () => {
+      isMounted = false;
+    }
   }, [loadCompras]);
 
   if (!user) {
@@ -68,11 +80,6 @@ export default function ComprasPage() {
   }
 
   const adminHeaders = adminNitHeaders(user.nit_empleado);
-
-  const rowsFiltradas = useMemo(() => {
-    if (!filtroProveedor.nit) return rows;
-    return rows.filter((r) => r.nit_proveedor === filtroProveedor.nit);
-  }, [rows, filtroProveedor.nit]);
 
   return (
     <>

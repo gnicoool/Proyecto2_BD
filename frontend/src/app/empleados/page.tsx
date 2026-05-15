@@ -32,23 +32,30 @@ export default function EmpleadosPage() {
 
   const load = useCallback(async () => {
     if (!user?.nit_empleado) return;
-    setLoading(true);
-    setError(null);
     try {
       const data = await apiClient.get<EmpleadoListItem[]>("/empleados/", {
         headers: adminNitHeaders(user.nit_empleado),
       });
       setItems(data);
+      setError(null);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error al cargar empleados");
       setItems([]);
     } finally {
       setLoading(false);
     }
-  }, [user?.nit_empleado]);
+  }, [user]);
 
   useEffect(() => {
-    void load();
+    let isMounted = true;
+    const fetchAll = async() => {
+      if(isMounted) setLoading(true);
+      await load()
+    };
+    void fetchAll();
+    return () => {
+      isMounted = false;
+    }
   }, [load]);
 
   const closeModal = () => {

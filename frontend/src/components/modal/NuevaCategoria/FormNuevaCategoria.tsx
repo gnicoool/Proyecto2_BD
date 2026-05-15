@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import {useState } from "react";
 import { Field, INPUT_CLASS } from "../NuevaPersona/personaModalShared";
 import { apiClient } from "../../../lib/apiClient";
 
@@ -8,19 +8,11 @@ type Props = {
   onSuccess?: () => void;
 };
 
-export function FormNuevaCategoria({ open, onClose, onSuccess }: Props) {
+export function FormNuevaCategoria({onClose, onSuccess }: Props) {
   const [nombre, setNombre] = useState("");
   const [descripcion, setDescripcion] = useState("");
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (open) {
-      setNombre("");
-      setDescripcion("");
-      setErr(null);
-    }
-  }, [open]);
 
   const handleSubmit = async () => {
     setErr(null);

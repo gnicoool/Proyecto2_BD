@@ -12,11 +12,10 @@ export default function CategoriasPage() {
   const [nuevaOpen, setNuevaOpen] = useState(false);
 
   const loadCategorias = useCallback(async () => {
-    setError(null);
-    setLoading(true);
     try {
       const data = await apiClient.get<Categoria[]>("/categorias/");
       setItems(data);
+      setError(null);
     } catch (e) {
       setError(e instanceof Error ? e.message : "No se pudieron cargar las categorías");
       setItems([]);
@@ -26,7 +25,15 @@ export default function CategoriasPage() {
   }, []);
 
   useEffect(() => {
-    void loadCategorias();
+    let isMounted = true;
+    const fetchAll = async() => {
+      if(isMounted) setLoading(true);
+      await loadCategorias();
+    };
+    void fetchAll();
+    return () => {
+      isMounted = false;
+    }
   }, [loadCategorias]);
 
   if (loading) {
@@ -66,6 +73,7 @@ export default function CategoriasPage() {
       <FloatingButton ariaLabel="Nueva categoría" onClick={() => setNuevaOpen(true)} />
 
       <NuevaCategoriaModal
+      key={nuevaOpen ? "open" : "closed"}
         open={nuevaOpen}
         onClose={() => setNuevaOpen(false)}
         onSuccess={() => void loadCategorias()}

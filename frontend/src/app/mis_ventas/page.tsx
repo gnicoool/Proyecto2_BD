@@ -27,8 +27,6 @@ function MisVentasContent({ user }: { user: LoginResponse }) {
   const [nuevaVentaOpen, setNuevaVentaOpen] = useState(false);
 
   const loadVentas = useCallback(async () => {
-    setError(null);
-    setLoading(true);
     try {
       const data = await apiClient.get<VentaCabecera[]>("/ventas/mis", {
         headers: {
@@ -36,6 +34,7 @@ function MisVentasContent({ user }: { user: LoginResponse }) {
         },
       });
       setRows(data);
+      setError(null);
     } catch (e) {
       setError(e instanceof Error ? e.message : "No se pudieron cargar las ventas");
     } finally {
@@ -44,7 +43,15 @@ function MisVentasContent({ user }: { user: LoginResponse }) {
   }, [user.nit_empleado]);
 
   useEffect(() => {
-    void loadVentas();
+    let isMounted = true;
+    const fetchAll = async() => {
+      if(isMounted) setLoading(true);
+      await loadVentas();
+    };
+    void fetchAll();
+    return () => {
+      isMounted = false;
+    }
   }, [loadVentas]);
 
   if (loading) {

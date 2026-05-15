@@ -37,13 +37,17 @@ export default function VentasPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [modalVentaId, setModalVentaId] = useState<number | null>(null);
+  
+  const rowsFiltradas = useMemo(() => {
+    if (!filtroEmpleado.nit) return rows;
+    return rows.filter((v) => (v.nit_empleado ?? "").trim() === filtroEmpleado.nit);
+  }, [rows, filtroEmpleado.nit]);
 
   const loadVentas = useCallback(async () => {
-    setError(null);
-    setLoading(true);
     try {
       const data = await apiClient.get<VentaCabecera[]>("/ventas/");
       setRows(data);
+      setError(null);
     } catch (e) {
       setError(e instanceof Error ? e.message : "No se pudieron cargar las ventas");
       setRows([]);
@@ -53,7 +57,15 @@ export default function VentasPage() {
   }, []);
 
   useEffect(() => {
-    void loadVentas();
+    let isMounted = true;
+    const fetchAll = async() => {
+      if(isMounted) setLoading(true);
+      await loadVentas();
+    };
+    void fetchAll();
+    return () => {
+      isMounted = false;
+    }
   }, [loadVentas]);
 
   if (!user) {
@@ -63,11 +75,6 @@ export default function VentasPage() {
   if (!isAdmin) {
     return <Navigate to={ROUTES.misVentas} replace />;
   }
-
-  const rowsFiltradas = useMemo(() => {
-    if (!filtroEmpleado.nit) return rows;
-    return rows.filter((v) => (v.nit_empleado ?? "").trim() === filtroEmpleado.nit);
-  }, [rows, filtroEmpleado.nit]);
 
   return (
     <>

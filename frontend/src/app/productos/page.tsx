@@ -92,8 +92,6 @@ export default function ProductosPage() {
   const adminHeaders = user ? adminNitHeaders(user.nit_empleado) : undefined;
 
   const loadProductos = useCallback(async () => {
-    setError(null);
-    setLoading(true);
     try {
       const path =
         filtroCategoria.id != null
@@ -104,10 +102,11 @@ export default function ProductosPage() {
       try {
         const marcaRows = await apiClient.get<MarcaApi[]>("/marcas/");
         marcasById = new Map(marcaRows.map((m) => [m.id_marca, m.nombre]));
-      } catch {
-        /* Marca names optional */
+      } catch(e) {
+        console.warn("No se pudieron cargar las marcas", e)
       }
       setProductos(mapProductos(prodRows, marcasById));
+      setError(null);
     } catch (e) {
       setError(e instanceof Error ? e.message : "No se pudieron cargar los productos");
       setProductos([]);
@@ -117,7 +116,15 @@ export default function ProductosPage() {
   }, [filtroCategoria.id]);
 
   useEffect(() => {
-    void loadProductos();
+    let isMounted = true;
+    const fetchAll = async() => {
+      if(isMounted) setLoading(true);
+      await loadProductos();
+    };
+    void fetchAll();
+    return () => {
+      isMounted = false;
+    }
   }, [loadProductos]);
 
   if (loading) {

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useId, useMemo, useState } from "react";
+import { useEffect, useId, useMemo, useState } from "react";
 import { Plus, Trash2, ShoppingBag } from "lucide-react";
 import { apiClient } from "../../../lib/apiClient";
 import type { ProductoListItem } from "../../../types/producto";
@@ -51,13 +51,15 @@ export function FormNuevaCompra({ onClose, onSuccess, requestHeaders }: Props) {
 
   useEffect(() => {
     let cancelled = false;
-    setLoadErr(null);
     (async () => {
       try {
         const data = await apiClient.get<ProveedorListItem[]>("/proveedores/", {
           headers: requestHeaders,
         });
-        if (!cancelled) setProveedores(data.filter((p) => p.activo));
+        if (!cancelled) {
+          setProveedores(data.filter((p) => p.activo));
+          setLoadErr(null);
+        }
       } catch (e) {
         if (!cancelled) {
           setLoadErr(e instanceof Error ? e.message : "No se pudieron cargar proveedores");
@@ -69,9 +71,15 @@ export function FormNuevaCompra({ onClose, onSuccess, requestHeaders }: Props) {
     };
   }, [requestHeaders]);
 
-  const cargarProductosProveedor = useCallback(
-    async (nit: string) => {
-      if (!nit.trim()) {
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      await Promise.resolve();
+      if (cancelled) return;
+      setLineas([{ key: genKey(), id_producto: "", cantidad: 1 }]);
+      setFormErr(null);
+      const nit = nitProveedor.trim();
+      if (!nit) {
         setProductosProv([]);
         return;
       }
@@ -79,25 +87,25 @@ export function FormNuevaCompra({ onClose, onSuccess, requestHeaders }: Props) {
       setLoadErr(null);
       try {
         const data = await apiClient.get<ProductoListItem[]>(
-          `/compras/productos-por-proveedor/${encodeURIComponent(nit.trim())}`,
+          `/compras/productos-por-proveedor/${encodeURIComponent(nit)}`,
         );
-        setProductosProv(data);
-        setLoadErr(null);
+        if (!cancelled) {
+          setProductosProv(data);
+          setLoadErr(null);
+        }
       } catch (e) {
-        setProductosProv([]);
-        setLoadErr(e instanceof Error ? e.message : "No se pudieron cargar productos");
+        if (!cancelled) {
+          setProductosProv([]);
+          setLoadErr(e instanceof Error ? e.message : "No se pudieron cargar productos");
+        }
       } finally {
-        setLoadingProductos(false);
+        if (!cancelled) setLoadingProductos(false);
       }
-    },
-    [],
-  );
-
-  useEffect(() => {
-    void cargarProductosProveedor(nitProveedor);
-    setLineas([{ key: genKey(), id_producto: "", cantidad: 1 }]);
-    setFormErr(null);
-  }, [nitProveedor, cargarProductosProveedor]);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [nitProveedor]);
 
   const addLinea = () => {
     setLineas((prev) => [...prev, { key: genKey(), id_producto: "", cantidad: 1 }]);

@@ -1,4 +1,4 @@
-import { formatFechaVenta } from "../personas/tableventas";
+import { formatFechaVenta } from "../../lib/formato/formatos";
 import type { UltimaLineaVentaRow } from "../../types/informes";
 import { fmtMoney } from "./informesFormat";
 

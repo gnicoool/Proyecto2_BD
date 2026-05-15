@@ -11,12 +11,7 @@ type Props = {
 export function NuevoProductoModal({ open, onClose, onSuccess, requestHeaders }: Props) {
   return (
     <PersonaModal open={open} onClose={onClose} title="Nuevo Producto">
-      <FormNuevoProducto
-        open={open}
-        onClose={onClose}
-        onSuccess={onSuccess}
-        requestHeaders={requestHeaders}
-      />
+      <FormNuevoProducto onClose={onClose} onSuccess={onSuccess} requestHeaders={requestHeaders} />
     </PersonaModal>
   );
 }

@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { X, Printer } from "lucide-react";
 import { apiClient } from "../../../lib/apiClient";
 import type { CompraDetalleRespuesta } from "../../../types/compra";
-import { formatFechaVenta, formatMonto } from "../../personas/tableventas";
+import { formatFechaVenta, formatMonto } from "../../../lib/formato/formatos";
 
 function toNum(v: number | string): number {
   const n = typeof v === "number" ? v : Number.parseFloat(String(v));
@@ -22,14 +22,15 @@ export function CompraProductosModal({ open, idCompra, onClose }: Props) {
 
   useEffect(() => {
     if (!open || idCompra == null) {
-      setData(null);
-      setErr(null);
       return;
     }
     let cancelled = false;
-    setLoading(true);
-    setErr(null);
     (async () => {
+      await Promise.resolve();
+      if (cancelled) return;
+      setLoading(true);
+      setErr(null);
+      setData(null);
       try {
         const res = await apiClient.get<CompraDetalleRespuesta>(
           `/compras/${idCompra}/detalle`,

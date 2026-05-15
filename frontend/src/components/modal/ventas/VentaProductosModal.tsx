@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { X, Printer } from "lucide-react";
 import { apiClient } from "../../../lib/apiClient";
 import type { VentaDetalleRespuesta } from "../../../types/venta";
-import { formatFechaVenta, formatMonto } from "../../personas/tableventas";
+import { formatFechaVenta, formatMonto } from "../../../lib/formato/formatos";
 
 function toNum(v: number | string): number {
   const n = typeof v === "number" ? v : Number.parseFloat(String(v));
@@ -22,14 +22,15 @@ export function VentaProductosModal({ open, idVenta, onClose }: Props) {
 
   useEffect(() => {
     if (!open || idVenta == null) {
-      setData(null);
-      setErr(null);
       return;
     }
     let cancelled = false;
-    setLoading(true);
-    setErr(null);
     (async () => {
+      await Promise.resolve();
+      if (cancelled) return;
+      setLoading(true);
+      setErr(null);
+      setData(null);
       try {
         const res = await apiClient.get<VentaDetalleRespuesta>(`/ventas/${idVenta}`);
         if (!cancelled) setData(res);
@@ -42,7 +43,9 @@ export function VentaProductosModal({ open, idVenta, onClose }: Props) {
         if (!cancelled) setLoading(false);
       }
     })();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [open, idVenta]);
 
   if (!open) return null;
