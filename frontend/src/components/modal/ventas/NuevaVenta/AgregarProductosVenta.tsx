@@ -30,7 +30,7 @@ export function AgregarProductosVenta({
   onRemoveLinea,
 }: AgregarProductosVentaProps) {
   return (
-    <div>
+    <div className="relative z-20 overflow-visible">
       <div className="mb-2 flex items-center justify-between">
         <span className="text-sm font-medium text-neutral-800">Productos</span>
         <button
@@ -43,7 +43,7 @@ export function AgregarProductosVenta({
         </button>
       </div>
 
-      <ul className="space-y-3">
+      <ul className="space-y-3 overflow-visible">
         {lineas.map((line) => (
           <LineaProductoRow
             key={line.key}
@@ -97,7 +97,9 @@ function LineaProductoRow({
     line.id_producto !== "" && sel ? sel.nombre : line.productoInput;
 
   return (
-    <li className="flex flex-wrap items-end gap-2 rounded-lg border border-neutral-200 p-3">
+    <li
+      className={`flex flex-wrap items-end gap-2 rounded-lg border border-neutral-200 p-3 ${menuOpen ? "relative z-[110]" : ""}`}
+    >
       <div ref={containerRef} className="relative min-w-[180px] flex-1">
         <label className="mb-1 block text-xs text-neutral-500">Producto</label>
         <input
@@ -117,7 +119,7 @@ function LineaProductoRow({
           id={`${formId}-prod-${line.key}`}
         />
         {menuOpen && line.id_producto === "" ? (
-          <ul className="absolute z-20 mt-1 max-h-48 w-full overflow-auto rounded-md border border-neutral-200 bg-white py-1 text-sm shadow-lg">
+          <ul className="absolute bottom-full left-0 right-0 z-[110] mb-1 max-h-52 w-full overflow-auto rounded-md border border-neutral-200 bg-white py-1 text-sm shadow-xl">
             {filtered.length === 0 ? (
               <li className="px-3 py-2 text-neutral-500">
                 {debouncedProducto.trim() ? "Sin coincidencias" : "Escribe para filtrar"}

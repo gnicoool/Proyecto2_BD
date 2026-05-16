@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import { NavLink, Link, useNavigate } from "react-router-dom";
-import { UserCircle2, LogOut } from "lucide-react";
+import { UserCircle2, LogOut, ShoppingCart } from "lucide-react";
 import { ROUTES } from "../../../lib/authRoutes";
 import { useAuth } from "../../../hooks/useAuth";
+import { useNuevaVentaDraftOptional } from "../../../context/NuevaVentaDraftContext";
 
 const tabBase =
   "rounded-t-lg border border-transparent border-b-0 px-[1.125rem] pb-3 pt-2.5 text-[0.9375rem] font-bold text-neutral-950 transition-colors duration-150";
@@ -41,11 +42,14 @@ export function Navbar() {
     };
   }, [menuOpen]);
 
+  const draft = useNuevaVentaDraftOptional();
+  const cartUnits = !isAdmin ? draft?.totalUnidades ?? 0 : 0;
+
   if (!user) return null;
 
   return (
     <header
-      className={`relative z-[2] box-border flex flex-wrap items-end gap-4 bg-[#5bb0cf] px-6 pb-0 pt-3 font-sans ${isAdmin ? "justify-between" : "justify-end"}`}
+      className={`relative z-[2] box-border flex flex-wrap items-end gap-4 bg-[#5bb0cf] px-6 pb-0 pt-3 font-sans justify-between`}
     >
       {isAdmin ? (
         <div className="flex min-w-0 flex-1 flex-wrap items-end gap-x-6 gap-y-2">
@@ -82,7 +86,47 @@ export function Navbar() {
             </NavLink>
           </nav>
         </div>
-      ) : null}
+      ) : (
+        <div className="flex min-w-0 flex-1 flex-wrap items-end gap-x-6 gap-y-2">
+          <Link
+            to={ROUTES.misVentas}
+            className="mb-0.5 mr-1 px-1 pb-3 pt-2 text-base font-bold tracking-wide text-neutral-950 no-underline hover:underline"
+          >
+            SuperMercado
+          </Link>
+          <nav className="flex flex-wrap items-end gap-0.5" aria-label="Tienda">
+            <NavLink
+              to={ROUTES.tiendaCategorias}
+              className={({ isActive }) => tabClass(isActive)}
+              end
+            >
+              Categorías
+            </NavLink>
+            <NavLink to={ROUTES.tiendaMarcas} className={({ isActive }) => tabClass(isActive)} end>
+              Marcas
+            </NavLink>
+            <NavLink to={ROUTES.tiendaProductos} className={({ isActive }) => tabClass(isActive)}>
+              Productos
+            </NavLink>
+            <NavLink to={ROUTES.misVentas} className={({ isActive }) => tabClass(isActive)} end>
+              Mis ventas
+            </NavLink>
+            <Link
+              to={ROUTES.misVentas}
+              state={{ finalizeSale: true }}
+              className="relative mb-0.5 inline-flex items-center gap-1.5 rounded-t-lg border border-transparent border-b-0 px-3 pb-3 pt-2.5 text-[0.9375rem] font-bold text-neutral-950 hover:bg-white/20"
+              aria-label="Finalizar venta con el carrito"
+            >
+              <ShoppingCart className="h-5 w-5" aria-hidden />
+              {cartUnits > 0 ? (
+                <span className="absolute right-0.5 top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-emerald-600 px-1 text-[10px] font-bold text-white">
+                  {cartUnits > 99 ? "99+" : cartUnits}
+                </span>
+              ) : null}
+            </Link>
+          </nav>
+        </div>
+      )}
 
       <div className="relative shrink-0 pb-[0.35rem]" ref={wrapRef}>
         <button

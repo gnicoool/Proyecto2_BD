@@ -2,27 +2,43 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ShoppingCart } from "lucide-react";
 import { apiClient } from "../../../../lib/apiClient";
 import { useDebouncedValue } from "../../../../hooks/useDebouncedValue";
+import type { NuevaVentaDraftLine } from "../../../../context/NuevaVentaDraftContext";
 import type { ProductoListItem } from "../../../../types/producto";
 import type { ClienteListItem } from "../../../../types/cliente";
 import type { VentaDetalleRespuesta } from "../../../../types/venta";
 import { AgregarProductosVenta } from "./AgregarProductosVenta";
-import {
-  clienteSelectedLabel,
-  DEBOUNCE_MS,
-  genKey,
-  matchesText,
-  type LineaForm,
-  toNum,
-} from "./nuevaVentaUtils";
+import { clienteSelectedLabel, DEBOUNCE_MS, genKey, matchesText, type LineaForm, toNum,} from "./nuevaVentaUtils";
 
 type FormNuevaVentaProps = {
   formId: string;
   nitEmpleado: string;
   onClose: () => void;
   onCreated: () => void;
+  initialDraftLines?: NuevaVentaDraftLine[] | null;
 };
 
-export function FormNuevaVenta({ formId, nitEmpleado, onClose, onCreated }: FormNuevaVentaProps) {
+function lineasInicialesFromDraft(d: NuevaVentaDraftLine[] | null | undefined): LineaForm[] {
+  if (!d?.length) {
+    return [{ key: genKey(), id_producto: "", cantidad: 1, productoInput: "" }];
+  }
+  return d.map((l) => ({
+    key: genKey(),
+    id_producto: l.id_producto,
+    cantidad: l.cantidad,
+    productoInput: l.nombre,
+  }));
+}
+
+export function FormNuevaVenta({
+  formId,
+  nitEmpleado,
+  onClose,
+  onCreated,
+  initialDraftLines,
+}: FormNuevaVentaProps) {
+  const [lineas, setLineas] = useState<LineaForm[]>(() =>
+    lineasInicialesFromDraft(initialDraftLines ?? null),
+  );
   const [productos, setProductos] = useState<ProductoListItem[]>([]);
   const [clientes, setClientes] = useState<ClienteListItem[]>([]);
   const [loadErr, setLoadErr] = useState<string | null>(null);
@@ -34,9 +50,6 @@ export function FormNuevaVenta({ formId, nitEmpleado, onClose, onCreated }: Form
   const [clienteMenuOpen, setClienteMenuOpen] = useState(false);
   const clienteContainerRef = useRef<HTMLDivElement>(null);
 
-  const [lineas, setLineas] = useState<LineaForm[]>([
-    { key: genKey(), id_producto: "", cantidad: 1, productoInput: "" },
-  ]);
   const [productMenuOpenKey, setProductMenuOpenKey] = useState<string | null>(null);
   const productContainerRefs = useRef<Map<string, HTMLDivElement>>(new Map());
 
@@ -226,7 +239,7 @@ export function FormNuevaVenta({ formId, nitEmpleado, onClose, onCreated }: Form
 
   return (
     <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col overflow-hidden">
-      <div className="space-y-4 overflow-y-auto px-4 py-4">
+      <div className="shrink-0 space-y-4 overflow-visible px-4 pt-4">
         {loadingCatalogo ? (
           <p className="text-sm text-neutral-500">Cargando catálogo…</p>
         ) : null}
@@ -237,7 +250,7 @@ export function FormNuevaVenta({ formId, nitEmpleado, onClose, onCreated }: Form
           </p>
         ) : null}
 
-        <fieldset className="space-y-2">
+        <fieldset className="relative z-30 space-y-2 overflow-visible">
           <legend className="text-sm font-medium text-neutral-800">Cliente</legend>
 
           <label className="flex cursor-pointer items-center gap-2 text-sm">
@@ -266,7 +279,10 @@ export function FormNuevaVenta({ formId, nitEmpleado, onClose, onCreated }: Form
               </span>
             </p>
           ) : (
-            <div ref={clienteContainerRef} className="relative">
+            <div
+              ref={clienteContainerRef}
+              className={`relative ${clienteMenuOpen && idCliente === "" ? "z-[110]" : ""}`}
+            >
               <label htmlFor={`${formId}-cliente`} className="mb-1 block text-xs text-neutral-500">
                 Buscar cliente por nombre o NIT
               </label>
@@ -287,7 +303,7 @@ export function FormNuevaVenta({ formId, nitEmpleado, onClose, onCreated }: Form
                 className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm"
               />
               {clienteMenuOpen && idCliente === "" ? (
-                <ul className="absolute z-20 mt-1 max-h-48 w-full overflow-auto rounded-md border border-neutral-200 bg-white py-1 text-sm shadow-lg">
+                <ul className="absolute left-0 right-0 top-full z-[110] mt-1 max-h-52 w-full overflow-auto rounded-md border border-neutral-200 bg-white py-1 text-sm shadow-xl">
                   {filteredClientes.length === 0 ? (
                     <li className="px-3 py-2 text-neutral-500">
                       {debouncedClienteQ.trim()
@@ -318,7 +334,9 @@ export function FormNuevaVenta({ formId, nitEmpleado, onClose, onCreated }: Form
             </div>
           )}
         </fieldset>
+      </div>
 
+      <div className="relative z-10 min-h-0 flex-1 overflow-y-auto overflow-x-visible px-4 pb-4">
         <AgregarProductosVenta
           formId={formId}
           lineas={lineas}
@@ -333,7 +351,7 @@ export function FormNuevaVenta({ formId, nitEmpleado, onClose, onCreated }: Form
         />
 
         {formErr ? (
-          <p className="rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+          <p className="mt-3 rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
             {formErr}
           </p>
         ) : null}

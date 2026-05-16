@@ -1,5 +1,6 @@
 import { useId } from "react";
 import { X } from "lucide-react";
+import type { NuevaVentaDraftLine } from "../../../../context/NuevaVentaDraftContext";
 import { FormNuevaVenta } from "./FormNuevaVenta";
 
 type Props = {
@@ -7,9 +8,16 @@ type Props = {
   onClose: () => void;
   nitEmpleado: string;
   onCreated: () => void;
+  initialDraftLines?: NuevaVentaDraftLine[] | null;
 };
 
-export function NuevaVentaModal({ open, onClose, nitEmpleado, onCreated }: Props) {
+export function NuevaVentaModal({
+  open,
+  onClose,
+  nitEmpleado,
+  onCreated,
+  initialDraftLines,
+}: Props) {
   const formId = useId();
 
   if (!open) return null;
@@ -47,6 +55,7 @@ export function NuevaVentaModal({ open, onClose, nitEmpleado, onCreated }: Props
           nitEmpleado={nitEmpleado}
           onClose={onClose}
           onCreated={onCreated}
+          initialDraftLines={initialDraftLines}
         />
       </div>
     </div>

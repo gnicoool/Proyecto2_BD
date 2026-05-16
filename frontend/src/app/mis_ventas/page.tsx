@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useState } from "react";
-import { Navigate } from "react-router-dom";
-import { Plus } from "lucide-react";
+import { Navigate, useLocation, useNavigate } from "react-router-dom";
 import { apiClient } from "../../lib/apiClient";
 import { ROUTES } from "../../lib/authRoutes";
 import { useAuth } from "../../hooks/useAuth";
+import type { NuevaVentaDraftLine } from "../../context/NuevaVentaDraftContext";
+import { useNuevaVentaDraft } from "../../context/NuevaVentaDraftContext";
 import type { LoginResponse } from "../../types/auth";
 import type { VentaCabecera, VentaTablaRow } from "../../types/venta";
 import { VentasTable } from "../../components/personas/tableventas";
@@ -20,11 +21,18 @@ function mapCabeceraToRow(v: VentaCabecera): VentaTablaRow {
 }
 
 function MisVentasContent({ user }: { user: LoginResponse }) {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const draft = useNuevaVentaDraft();
+
   const [rows, setRows] = useState<VentaCabecera[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [modalVentaId, setModalVentaId] = useState<number | null>(null);
   const [nuevaVentaOpen, setNuevaVentaOpen] = useState(false);
+  const [draftSnapshotForModal, setDraftSnapshotForModal] = useState<NuevaVentaDraftLine[] | null>(
+    null,
+  );
 
   const loadVentas = useCallback(async () => {
     try {
@@ -44,15 +52,29 @@ function MisVentasContent({ user }: { user: LoginResponse }) {
 
   useEffect(() => {
     let isMounted = true;
-    const fetchAll = async() => {
-      if(isMounted) setLoading(true);
+    const fetchAll = async () => {
+      if (isMounted) setLoading(true);
       await loadVentas();
     };
     void fetchAll();
     return () => {
       isMounted = false;
-    }
+    };
   }, [loadVentas]);
+
+  useEffect(() => {
+    const st = location.state as { finalizeSale?: boolean } | undefined;
+    if (!st?.finalizeSale) return;
+    const lineasSnapshot = draft.lineas.map((l) => ({ ...l }));
+    const total = draft.totalLineas;
+    navigate(".", { replace: true, state: {} });
+    void Promise.resolve().then(() => {
+      if (total > 0) {
+        setDraftSnapshotForModal(lineasSnapshot);
+        setNuevaVentaOpen(true);
+      }
+    });
+  }, [location.state, navigate, draft]);
 
   if (loading) {
     return <p className="text-sm text-neutral-600">Cargando ventas…</p>;
@@ -62,9 +84,15 @@ function MisVentasContent({ user }: { user: LoginResponse }) {
     return <p className="text-sm text-red-600">{error}</p>;
   }
 
+  const handleCloseNuevaVenta = () => {
+    setNuevaVentaOpen(false);
+    setDraftSnapshotForModal(null);
+    draft.clearDraft();
+  };
+
   return (
     <>
-      <div className="relative mx-auto max-w-5xl px-4 pb-24">
+      <div className="relative mx-auto max-w-5xl px-4 pb-10">
         <h1 className="mb-2 text-2xl font-bold text-neutral-900">Mis ventas</h1>
 
         <p className="mb-6 text-sm text-neutral-600">
@@ -79,15 +107,6 @@ function MisVentasContent({ user }: { user: LoginResponse }) {
         />
       </div>
 
-      <button
-        type="button"
-        onClick={() => setNuevaVentaOpen(true)}
-        className="fixed bottom-6 right-6 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-sky-600 text-white shadow-lg transition hover:bg-sky-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-600"
-        aria-label="Nueva venta"
-      >
-        <Plus className="h-7 w-7" strokeWidth={2.5} />
-      </button>
-
       <VentaProductosModal
         open={modalVentaId !== null}
         idVenta={modalVentaId}
@@ -96,9 +115,15 @@ function MisVentasContent({ user }: { user: LoginResponse }) {
 
       <NuevaVentaModal
         open={nuevaVentaOpen}
-        onClose={() => setNuevaVentaOpen(false)}
+        onClose={handleCloseNuevaVenta}
         nitEmpleado={user.nit_empleado}
-        onCreated={() => void loadVentas()}
+        initialDraftLines={draftSnapshotForModal?.length ? draftSnapshotForModal : null}
+        onCreated={() => {
+          draft.clearDraft();
+          setDraftSnapshotForModal(null);
+          setNuevaVentaOpen(false);
+          void loadVentas();
+        }}
       />
     </>
   );
