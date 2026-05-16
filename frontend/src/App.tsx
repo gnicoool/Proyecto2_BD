@@ -13,6 +13,9 @@ import ProductosPage from "./app/productos/page";
 import ProveedoresPage from "./app/proveedores/page";
 import ComprasPage from "./app/compras/page";
 import VentasPage from "./app/ventas/page";
+import TiendaCategoriasPage from "./app/tienda/categorias/page";
+import TiendaMarcasPage from "./app/tienda/marcas/page";
+import TiendaProductosPage from "./app/tienda/productos/page";
 
 export default function App() {
   return (
@@ -23,6 +26,9 @@ export default function App() {
           <Route path="/" element={<Layout />}>
             <Route index element={<RootIndexRedirect />} />
             <Route path="mis-ventas" element={<MisVentasPage />} />
+            <Route path="tienda/categorias" element={<TiendaCategoriasPage />} />
+            <Route path="tienda/marcas" element={<TiendaMarcasPage />} />
+            <Route path="tienda/productos" element={<TiendaProductosPage />} />
             <Route element={<RequireAdmin />}>
               <Route path="categorias" element={<CategoriasPage />} />
               <Route path="marcas" element={<MarcasPage />} />

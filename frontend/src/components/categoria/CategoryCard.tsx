@@ -5,9 +5,10 @@ import { getCategoryIcon } from "./CategoryIcons";
 
 type Props = {
   categoria: Categoria;
+  productosListPath?: string;
 };
 
-export function CategoryCard({ categoria }: Props) {
+export function CategoryCard({ categoria, productosListPath = "/productos" }: Props) {
   const navigate = useNavigate();
   const iconEl = createElement(getCategoryIcon(categoria.nombre), {
     className: "h-10 w-10 shrink-0 text-[#1a6e96]",
@@ -20,7 +21,7 @@ export function CategoryCard({ categoria }: Props) {
       id_categoria: String(categoria.id_categoria),
       nombre: categoria.nombre,
     });
-    navigate(`/productos?${params.toString()}`);
+    navigate(`${productosListPath}?${params.toString()}`);
   };
 
   return (
