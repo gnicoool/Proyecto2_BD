@@ -1,26 +1,10 @@
-import { createContext, useCallback, useContext, useMemo, useState, type ReactNode,} from "react";
+import { useCallback, useMemo, useState, type ReactNode } from "react";
 import type { ProductoListItem } from "../types/producto";
-
-export type NuevaVentaDraftLine = {
-  id_producto: number;
-  cantidad: number;
-  precio_venta: number;
-  nombre: string;
-  cant_disponible: number;
-};
-
-type NuevaVentaDraftContextValue = {
-  lineas: NuevaVentaDraftLine[];
-  totalUnidades: number;
-  totalLineas: number;
-  addOrIncrementProduct: (p: ProductoListItem, delta?: number) => { ok: true } | { ok: false; reason: string };
-  setCantidad: (id_producto: number, cantidad: number) => { ok: true } | { ok: false; reason: string };
-  removeLine: (id_producto: number) => void;
-  clearDraft: () => void;
-  getProductosPayload: () => { id_producto: number; cantidad_venta: number; precio_venta: number }[];
-};
-
-const NuevaVentaDraftContext = createContext<NuevaVentaDraftContextValue | null>(null);
+import {
+  NuevaVentaDraftContext,
+  type NuevaVentaDraftContextValue,
+} from "./nuevaVentaDraftContext";
+import type { NuevaVentaDraftLine } from "./nuevaVentaDraftTypes";
 
 function toNum(v: number | string): number {
   const n = typeof v === "number" ? v : Number.parseFloat(String(v));
@@ -148,16 +132,4 @@ export function NuevaVentaDraftProvider({ children }: { children: ReactNode }) {
   return (
     <NuevaVentaDraftContext.Provider value={value}>{children}</NuevaVentaDraftContext.Provider>
   );
-}
-
-export function useNuevaVentaDraft(): NuevaVentaDraftContextValue {
-  const ctx = useContext(NuevaVentaDraftContext);
-  if (!ctx) {
-    throw new Error("useNuevaVentaDraft must be used within NuevaVentaDraftProvider");
-  }
-  return ctx;
-}
-
-export function useNuevaVentaDraftOptional(): NuevaVentaDraftContextValue | null {
-  return useContext(NuevaVentaDraftContext);
 }

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ShoppingCart } from "lucide-react";
 import { apiClient } from "../../../../lib/apiClient";
 import { useDebouncedValue } from "../../../../hooks/useDebouncedValue";
-import type { NuevaVentaDraftLine } from "../../../../context/NuevaVentaDraftContext";
+import type { NuevaVentaDraftLine } from "../../../../context/nuevaVentaDraftTypes";
 import type { ProductoListItem } from "../../../../types/producto";
 import type { ClienteListItem } from "../../../../types/cliente";
 import type { VentaDetalleRespuesta } from "../../../../types/venta";

@@ -1,6 +1,6 @@
 import { useId } from "react";
 import { X } from "lucide-react";
-import type { NuevaVentaDraftLine } from "../../../../context/NuevaVentaDraftContext";
+import type { NuevaVentaDraftLine } from "../../../../context/nuevaVentaDraftTypes";
 import { FormNuevaVenta } from "./FormNuevaVenta";
 
 type Props = {

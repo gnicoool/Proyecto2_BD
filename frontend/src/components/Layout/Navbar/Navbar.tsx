@@ -3,7 +3,7 @@ import { NavLink, Link, useNavigate } from "react-router-dom";
 import { UserCircle2, LogOut, ShoppingCart } from "lucide-react";
 import { ROUTES } from "../../../lib/authRoutes";
 import { useAuth } from "../../../hooks/useAuth";
-import { useNuevaVentaDraftOptional } from "../../../context/NuevaVentaDraftContext";
+import { useNuevaVentaDraftOptional } from "../../../context/useNuevaVentaDraft";
 
 const tabBase =
   "rounded-t-lg border border-transparent border-b-0 px-[1.125rem] pb-3 pt-2.5 text-[0.9375rem] font-bold text-neutral-950 transition-colors duration-150";

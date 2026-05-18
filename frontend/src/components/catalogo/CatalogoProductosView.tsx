@@ -8,7 +8,7 @@ import { apiClient } from "../../lib/apiClient";
 import { adminNitHeaders } from "../../lib/adminHeaders";
 import { productoViewToListItem } from "../../lib/productoViewToListItem";
 import { useAuth } from "../../hooks/useAuth";
-import { useNuevaVentaDraftOptional } from "../../context/NuevaVentaDraftContext";
+import { useNuevaVentaDraftOptional } from "../../context/useNuevaVentaDraft";
 
 type ProductoApi = {
   id_producto: number;

@@ -1,5 +1,5 @@
 import { Outlet } from "react-router-dom";
-import { NuevaVentaDraftProvider } from "../../context/NuevaVentaDraftContext";
+import { NuevaVentaDraftProvider } from "../../context/NuevaVentaDraftProvider";
 import { Navbar } from "./Navbar/Navbar";
 
 export default function Layout() {
