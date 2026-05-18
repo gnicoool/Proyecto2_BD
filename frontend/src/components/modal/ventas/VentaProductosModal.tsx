@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
-import { X, Printer } from "lucide-react";
+import { X, Printer, Download } from "lucide-react";
 import { apiClient } from "../../../lib/apiClient";
+import { downloadVentaDetalleCsv } from "../../../lib/export/ventaDetalleCsv";
 import type { VentaDetalleRespuesta } from "../../../types/venta";
 import { formatFechaVenta, formatMonto } from "../../../lib/formato/formatos";
 
@@ -70,16 +71,26 @@ export function VentaProductosModal({ open, idVenta, onClose }: Props) {
             Detalle de Venta
           </h2>
           <div className="flex items-center gap-1">
-            {data && (
-              <button
-                type="button"
-                onClick={() => window.print()}
-                className="rounded-lg p-1.5 text-sky-400 transition hover:bg-sky-100 hover:text-sky-700"
-                aria-label="Imprimir factura"
-              >
-                <Printer className="h-4 w-4" />
-              </button>
-            )}
+            {data ? (
+              <>
+                <button
+                  type="button"
+                  onClick={() => downloadVentaDetalleCsv(data)}
+                  className="rounded-lg p-1.5 text-sky-400 transition hover:bg-sky-100 hover:text-sky-700"
+                  aria-label="Descargar CSV"
+                >
+                  <Download className="h-4 w-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => window.print()}
+                  className="rounded-lg p-1.5 text-sky-400 transition hover:bg-sky-100 hover:text-sky-700"
+                  aria-label="Imprimir factura"
+                >
+                  <Printer className="h-4 w-4" />
+                </button>
+              </>
+            ) : null}
             <button
               type="button"
               onClick={onClose}
