@@ -13,7 +13,7 @@ async def lifespan(app: FastAPI):
     database.close_pool()
 
 
-app = FastAPI(title="BD Proyecto 2 API", version="1.0.0", lifespan=lifespan)
+app = FastAPI(title="Proyecto 2 web", version="1.0.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,

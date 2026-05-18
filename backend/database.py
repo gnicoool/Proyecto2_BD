@@ -6,21 +6,27 @@ from contextlib import contextmanager
 
 _pool: SimpleConnectionPool | None = None
 
-
 def init_pool():
     global _pool
-    host = (os.getenv("DB_HOST") or "db").strip() or "db"
-    port = int((os.getenv("DB_PORT") or "5432").strip() or "5432")
-    _pool = SimpleConnectionPool(
-        minconn=1,
-        maxconn=10,
-        host=host,
-        port=port,
-        dbname=os.getenv("DB_NAME", "postgres"),
-        user=os.getenv("DB_USER", "postgres"),
-        password=os.getenv("DB_PASSWORD", ""),
-    )
 
+    database_url = os.getenv("DATABASE_URL")
+
+    if database_url:
+        _pool = SimpleConnectionPool(
+            minconn=1,
+            maxconn=10,
+            dsn=database_url
+        )
+    else:
+        _pool = SimpleConnectionPool(
+            minconn=1,
+            maxconn=10,
+            host=os.getenv("DB_HOST"),
+            port=os.getenv("DB_PORT"),
+            dbname=os.getenv("DB_NAME"),
+            user=os.getenv("DB_USER"),
+            password=os.getenv("DB_PASSWORD"),
+        )
 
 def close_pool():
     global _pool
