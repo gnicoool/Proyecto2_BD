@@ -1,3 +1,5 @@
+import { useAuthStore } from "../store/authStore";
+
 export type ApiError = Error & { status?: number };
 
 function parseDetail(detail: unknown): string {
@@ -26,9 +28,17 @@ export function resolveApiUrl(path: string): string {
   return `http://127.0.0.1:8000${p}`;
 }
 
+function withAuth(init?: RequestInit): RequestInit {
+  const token = useAuthStore.getState().token;
+  if (!token) return init ?? {};
+  const headers = new Headers(init?.headers);
+  headers.set("Authorization", `Bearer ${token}`);
+  return { ...init, headers };
+}
+
 async function requestJson<T>(path: string, init?: RequestInit): Promise<T> {
   const url = resolveApiUrl(path);
-  const res = await fetch(url, init);
+  const res = await fetch(url, withAuth(init));
   const text = await res.text();
   let data: unknown = {};
   if (text) {
