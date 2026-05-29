@@ -30,11 +30,7 @@ function MisVentasContent({ user }: { user: LoginResponse }) {
     setError(null);
     setLoading(true);
     try {
-      const data = await apiClient.get<VentaCabecera[]>("/ventas/mis", {
-        headers: {
-          "X-NIT-Empleado": user.nit_empleado,
-        },
-      });
+      const data = await apiClient.get<VentaCabecera[]>("/ventas/mis");
       setRows(data);
     } catch (e) {
       setError(e instanceof Error ? e.message : "No se pudieron cargar las ventas");
@@ -98,15 +94,9 @@ function MisVentasContent({ user }: { user: LoginResponse }) {
 }
 
 export default function MisVentasPage() {
-  const { user, isAdmin } = useAuth();
+  const { user } = useAuth();
 
-  if (isAdmin) {
-    return <Navigate to={ROUTES.categorias} replace />;
-  }
-
-  if (!user) {
-    return null;
-  }
+  if (!user) return null;
 
   return <MisVentasContent user={user} />;
 }

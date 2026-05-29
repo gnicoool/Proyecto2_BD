@@ -3,7 +3,7 @@ import { useForm } from "react-hook-form";
 import { Eye, EyeOff } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { apiClient, type ApiError } from "../../../lib/apiClient";
-import { ROUTES } from "../../../lib/authRoutes";
+import { getHomeRouteForRol } from "../../../lib/authRoutes";
 import { useAuthStore } from "../../../store/authStore";
 import type { LoginResponse } from "../../../types/auth";
 
@@ -33,8 +33,7 @@ export default function LoginForm() {
         contrasena: data.contrasena,
       });
       login(response);
-      const isAdmin = response.id_rol === 1 || response.rol === "admin";
-      navigate(isAdmin ? ROUTES.categorias : ROUTES.misVentas, { replace: true });
+      navigate(getHomeRouteForRol(response.rol), { replace: true });
     } catch (error) {
       const apiError = error as ApiError;
       setServerError(apiError.message || "No fue posible iniciar sesión");

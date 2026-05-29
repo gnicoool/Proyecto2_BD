@@ -4,7 +4,6 @@ import { Plus } from "lucide-react";
 import { PersonasTable, type PersonaRow } from "../../components/personas/tablepersona";
 import { NuevoProveedorModal } from "../../components/modal/NuevaPersona/proveedor/NuevoProveedorModal";
 import { apiClient } from "../../lib/apiClient";
-import { adminNitHeaders } from "../../lib/adminHeaders";
 import { useAuth } from "../../hooks/useAuth";
 import type { ProveedorListItem } from "../../types/proveedor";
 
@@ -21,7 +20,7 @@ function mapProveedor(p: ProveedorListItem): PersonaRow {
 
 export default function ProveedoresPage() {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, isAdmin } = useAuth();
   const [items, setItems] = useState<ProveedorListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -31,13 +30,11 @@ export default function ProveedoresPage() {
   const rows = useMemo(() => items.map(mapProveedor), [items]);
 
   const load = useCallback(async () => {
-    if (!user?.nit_empleado) return;
+    if (!user) return;
     setLoading(true);
     setError(null);
     try {
-      const data = await apiClient.get<ProveedorListItem[]>("/proveedores/", {
-        headers: adminNitHeaders(user.nit_empleado),
-      });
+      const data = await apiClient.get<ProveedorListItem[]>("/proveedores/");
       setItems(data);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error al cargar proveedores");
@@ -45,7 +42,7 @@ export default function ProveedoresPage() {
     } finally {
       setLoading(false);
     }
-  }, [user?.nit_empleado]);
+  }, [user]);
 
   useEffect(() => {
     void load();
@@ -57,18 +54,11 @@ export default function ProveedoresPage() {
   };
 
   const handleDelete = async (nit: string) => {
-    if (!user?.nit_empleado) return;
-    if (
-      !window.confirm(
-        "¿Desactivar o eliminar este proveedor? Si tiene compras, solo se desactivará.",
-      )
-    ) {
+    if (!window.confirm("¿Desactivar o eliminar este proveedor? Si tiene compras, solo se desactivará.")) {
       return;
     }
     try {
-      await apiClient.delete(`/proveedores/${encodeURIComponent(nit)}`, {
-        headers: adminNitHeaders(user.nit_empleado),
-      });
+      await apiClient.delete(`/proveedores/${encodeURIComponent(nit)}`);
       await load();
     } catch (e) {
       window.alert(e instanceof Error ? e.message : "No se pudo eliminar");
@@ -86,10 +76,7 @@ export default function ProveedoresPage() {
 
   const verComprasProveedor = (nit: string) => {
     const p = items.find((x) => x.nit_proveedor === nit);
-    const params = new URLSearchParams({
-      nit_proveedor: nit,
-      nombre: p?.nombre ?? "",
-    });
+    const params = new URLSearchParams({ nit_proveedor: nit, nombre: p?.nombre ?? "" });
     navigate(`/compras?${params.toString()}`);
   };
 
@@ -102,26 +89,26 @@ export default function ProveedoresPage() {
             Proveedores registrados y total de compras asociadas en el sistema.
           </p>
         </div>
-        <button
-          type="button"
-          onClick={() => {
-            setEditProveedor(null);
-            setCreateOpen(true);
-          }}
-          className="inline-flex items-center gap-2 rounded-lg bg-sky-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-sky-700"
-        >
-          <Plus className="h-4 w-4" strokeWidth={2.5} />
-          Nuevo proveedor
-        </button>
+        {isAdmin && (
+          <button
+            type="button"
+            onClick={() => { setEditProveedor(null); setCreateOpen(true); }}
+            className="inline-flex items-center gap-2 rounded-lg bg-sky-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-sky-700"
+          >
+            <Plus className="h-4 w-4" strokeWidth={2.5} />
+            Nuevo proveedor
+          </button>
+        )}
       </div>
 
-      <NuevoProveedorModal
-        open={modalOpen}
-        onClose={closeModal}
-        onSuccess={() => void load()}
-        requestHeaders={user?.nit_empleado ? adminNitHeaders(user.nit_empleado) : undefined}
-        editProveedor={editProveedor}
-      />
+      {isAdmin && (
+        <NuevoProveedorModal
+          open={modalOpen}
+          onClose={closeModal}
+          onSuccess={() => void load()}
+          editProveedor={editProveedor}
+        />
+      )}
 
       {loading ? (
         <p className="text-sm text-neutral-600">Cargando…</p>
@@ -134,8 +121,8 @@ export default function ProveedoresPage() {
               data={rows}
               tipo="proveedor"
               onView={verComprasProveedor}
-              onEdit={openEdit}
-              onDelete={handleDelete}
+              onEdit={isAdmin ? openEdit : undefined}
+              onDelete={isAdmin ? handleDelete : undefined}
             />
           </div>
         </div>

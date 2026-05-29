@@ -12,13 +12,14 @@ export type PersonaRow = {
 type Props = {
   data: PersonaRow[];
   tipo: "empleado" | "proveedor";
-  onEdit: (nit: string) => void;
-  onDelete: (nit: string) => void;
   onView: (nit: string) => void;
+  onEdit?: (nit: string) => void;
+  onDelete?: (nit: string) => void;
 };
 
-export function PersonasTable({ data, tipo, onEdit, onDelete, onView }: Props) {
+export function PersonasTable({ data, tipo, onView, onEdit, onDelete }: Props) {
   const labelVer = tipo === "empleado" ? "Ver ventas" : "Ver compras";
+  const showActions = onEdit !== undefined || onDelete !== undefined;
 
   if (data.length === 0) {
     return (
@@ -39,8 +40,8 @@ export function PersonasTable({ data, tipo, onEdit, onDelete, onView }: Props) {
             <th className="px-3 py-2 font-semibold">Correo</th>
             <th className="px-3 py-2 font-semibold">Estado</th>
             <th className="px-3 py-2 font-semibold text-center">{labelVer}</th>
-            <th className="px-3 py-2 text-center font-semibold">Editar</th>
-            <th className="px-3 py-2 text-center font-semibold">Eliminar</th>
+            {showActions && <th className="px-3 py-2 text-center font-semibold">Editar</th>}
+            {showActions && <th className="px-3 py-2 text-center font-semibold">Eliminar</th>}
           </tr>
         </thead>
 
@@ -80,27 +81,35 @@ export function PersonasTable({ data, tipo, onEdit, onDelete, onView }: Props) {
                 </button>
               </td>
 
-              <td className="px-3 py-2 text-center">
-                <button
-                  type="button"
-                  onClick={() => onEdit(p.nit)}
-                  className="text-amber-600 hover:text-amber-800"
-                  aria-label="Editar"
-                >
-                  <Pencil className="mx-auto h-[18px] w-[18px]" />
-                </button>
-              </td>
+              {showActions && (
+                <td className="px-3 py-2 text-center">
+                  {onEdit && (
+                    <button
+                      type="button"
+                      onClick={() => onEdit(p.nit)}
+                      className="text-amber-600 hover:text-amber-800"
+                      aria-label="Editar"
+                    >
+                      <Pencil className="mx-auto h-[18px] w-[18px]" />
+                    </button>
+                  )}
+                </td>
+              )}
 
-              <td className="px-3 py-2 text-center">
-                <button
-                  type="button"
-                  onClick={() => onDelete(p.nit)}
-                  className="text-red-600 hover:text-red-800"
-                  aria-label="Eliminar"
-                >
-                  <Trash2 className="mx-auto h-[18px] w-[18px]" />
-                </button>
-              </td>
+              {showActions && (
+                <td className="px-3 py-2 text-center">
+                  {onDelete && (
+                    <button
+                      type="button"
+                      onClick={() => onDelete(p.nit)}
+                      className="text-red-600 hover:text-red-800"
+                      aria-label="Eliminar"
+                    >
+                      <Trash2 className="mx-auto h-[18px] w-[18px]" />
+                    </button>
+                  )}
+                </td>
+              )}
             </tr>
           ))}
         </tbody>

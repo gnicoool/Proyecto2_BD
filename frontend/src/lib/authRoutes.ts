@@ -16,3 +16,20 @@ export const ROUTES = {
   proveedores: "/proveedores",
   empleados: "/empleados",
 } as const;
+
+/** Landing page after login or when visiting `/` while authenticated. */
+export function getHomeRouteForRol(rol: string): string {
+  switch (rol) {
+    case "Admin":
+      return ROUTES.ventas;
+    case "Vendedor":
+      return ROUTES.misVentas;
+    case "Bodeguero":
+      return ROUTES.compras;
+    case "Contador":
+    case "Supervisor":
+      return ROUTES.informes;
+    default:
+      return ROUTES.misVentas;
+  }
+}

@@ -1,9 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Link, Navigate, useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { Plus } from "lucide-react";
 import { apiClient } from "../../lib/apiClient";
-import { adminNitHeaders } from "../../lib/adminHeaders";
-import { ROUTES } from "../../lib/authRoutes";
 import { useAuth } from "../../hooks/useAuth";
 import type { CompraListaItem } from "../../types/compra";
 import type { VentaTablaRow } from "../../types/venta";
@@ -31,7 +29,7 @@ function parseProveedorComprasFilter(searchParams: URLSearchParams): {
 }
 
 export default function ComprasPage() {
-  const { user, isAdmin } = useAuth();
+  const { user, hasRol } = useAuth();
   const [searchParams] = useSearchParams();
   const filtroProveedor = useMemo(() => parseProveedorComprasFilter(searchParams), [searchParams]);
 
@@ -40,6 +38,8 @@ export default function ComprasPage() {
   const [error, setError] = useState<string | null>(null);
   const [modalCompraId, setModalCompraId] = useState<number | null>(null);
   const [nuevaOpen, setNuevaOpen] = useState(false);
+
+  const puedeCrear = hasRol("Admin", "Bodeguero");
 
   const loadCompras = useCallback(async () => {
     setError(null);
@@ -59,15 +59,7 @@ export default function ComprasPage() {
     void loadCompras();
   }, [loadCompras]);
 
-  if (!user) {
-    return null;
-  }
-
-  if (!isAdmin) {
-    return <Navigate to={ROUTES.misVentas} replace />;
-  }
-
-  const adminHeaders = adminNitHeaders(user.nit_empleado);
+  if (!user) return null;
 
   const rowsFiltradas = useMemo(() => {
     if (!filtroProveedor.nit) return rows;
@@ -78,10 +70,9 @@ export default function ComprasPage() {
     <>
       <div className="relative mx-auto max-w-6xl px-4 pb-28">
         <h1 className="mb-2 text-2xl font-bold text-neutral-900">Compras</h1>
-
         <p className="mb-6 text-sm text-neutral-600">
-          Registro de compras a proveedores. Consulta el detalle de productos por línea o registra
-          una nueva compra (productos asociados al historial del proveedor seleccionado).
+          Registro de compras a proveedores. Consulta el detalle de productos por línea
+          {puedeCrear ? " o registra una nueva compra." : "."}
         </p>
 
         {filtroProveedor.nit ? (
@@ -123,14 +114,16 @@ export default function ComprasPage() {
         )}
       </div>
 
-      <button
-        type="button"
-        onClick={() => setNuevaOpen(true)}
-        className="fixed bottom-6 right-6 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-emerald-600 text-white shadow-lg transition hover:bg-emerald-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600"
-        aria-label="Nueva compra"
-      >
-        <Plus className="h-7 w-7" strokeWidth={2.5} />
-      </button>
+      {puedeCrear && (
+        <button
+          type="button"
+          onClick={() => setNuevaOpen(true)}
+          className="fixed bottom-6 right-6 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-emerald-600 text-white shadow-lg transition hover:bg-emerald-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600"
+          aria-label="Nueva compra"
+        >
+          <Plus className="h-7 w-7" strokeWidth={2.5} />
+        </button>
+      )}
 
       <CompraProductosModal
         open={modalCompraId !== null}
@@ -138,12 +131,13 @@ export default function ComprasPage() {
         onClose={() => setModalCompraId(null)}
       />
 
-      <NuevaCompraModal
-        open={nuevaOpen}
-        onClose={() => setNuevaOpen(false)}
-        onSuccess={() => void loadCompras()}
-        requestHeaders={adminHeaders}
-      />
+      {puedeCrear && (
+        <NuevaCompraModal
+          open={nuevaOpen}
+          onClose={() => setNuevaOpen(false)}
+          onSuccess={() => void loadCompras()}
+        />
+      )}
     </>
   );
 }

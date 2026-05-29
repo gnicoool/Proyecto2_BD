@@ -4,7 +4,6 @@ import { Plus } from "lucide-react";
 import { PersonasTable, type PersonaRow } from "../../components/personas/tablepersona";
 import { NuevoEmpleadoModal } from "../../components/modal/NuevaPersona/empleado/NuevoEmpleadoModal";
 import { apiClient } from "../../lib/apiClient";
-import { adminNitHeaders } from "../../lib/adminHeaders";
 import { useAuth } from "../../hooks/useAuth";
 import type { EmpleadoListItem } from "../../types/empleado";
 
@@ -21,7 +20,7 @@ function mapEmpleado(e: EmpleadoListItem): PersonaRow {
 
 export default function EmpleadosPage() {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, isAdmin } = useAuth();
   const [items, setItems] = useState<EmpleadoListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -31,13 +30,11 @@ export default function EmpleadosPage() {
   const rows = useMemo(() => items.map(mapEmpleado), [items]);
 
   const load = useCallback(async () => {
-    if (!user?.nit_empleado) return;
+    if (!user) return;
     setLoading(true);
     setError(null);
     try {
-      const data = await apiClient.get<EmpleadoListItem[]>("/empleados/", {
-        headers: adminNitHeaders(user.nit_empleado),
-      });
+      const data = await apiClient.get<EmpleadoListItem[]>("/empleados/");
       setItems(data);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error al cargar empleados");
@@ -45,7 +42,7 @@ export default function EmpleadosPage() {
     } finally {
       setLoading(false);
     }
-  }, [user?.nit_empleado]);
+  }, [user]);
 
   useEffect(() => {
     void load();
@@ -57,18 +54,11 @@ export default function EmpleadosPage() {
   };
 
   const handleDelete = async (nit: string) => {
-    if (!user?.nit_empleado) return;
-    if (
-      !window.confirm(
-        "¿Eliminar o desactivar este empleado? Los administradores no pueden eliminarse desde aquí.",
-      )
-    ) {
+    if (!window.confirm("¿Eliminar o desactivar este empleado? Los administradores no pueden eliminarse desde aquí.")) {
       return;
     }
     try {
-      await apiClient.delete(`/empleados/${encodeURIComponent(nit)}`, {
-        headers: adminNitHeaders(user.nit_empleado),
-      });
+      await apiClient.delete(`/empleados/${encodeURIComponent(nit)}`);
       await load();
     } catch (e) {
       window.alert(e instanceof Error ? e.message : "No se pudo eliminar");
@@ -86,10 +76,7 @@ export default function EmpleadosPage() {
 
   const verVentasEmpleado = (nit: string) => {
     const e = items.find((x) => x.nit_empleado === nit);
-    const params = new URLSearchParams({
-      nit_empleado: nit,
-      nombre: e?.nombre ?? "",
-    });
+    const params = new URLSearchParams({ nit_empleado: nit, nombre: e?.nombre ?? "" });
     navigate(`/ventas?${params.toString()}`);
   };
 
@@ -102,26 +89,26 @@ export default function EmpleadosPage() {
             Usuarios del sistema: rol, ventas registradas y estado.
           </p>
         </div>
-        <button
-          type="button"
-          onClick={() => {
-            setEditEmpleado(null);
-            setCreateOpen(true);
-          }}
-          className="inline-flex items-center gap-2 rounded-lg bg-sky-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-sky-700"
-        >
-          <Plus className="h-4 w-4" strokeWidth={2.5} />
-          Nuevo empleado
-        </button>
+        {isAdmin && (
+          <button
+            type="button"
+            onClick={() => { setEditEmpleado(null); setCreateOpen(true); }}
+            className="inline-flex items-center gap-2 rounded-lg bg-sky-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-sky-700"
+          >
+            <Plus className="h-4 w-4" strokeWidth={2.5} />
+            Nuevo empleado
+          </button>
+        )}
       </div>
 
-      <NuevoEmpleadoModal
-        open={modalOpen}
-        onClose={closeModal}
-        onSuccess={() => void load()}
-        requestHeaders={user?.nit_empleado ? adminNitHeaders(user.nit_empleado) : undefined}
-        editEmpleado={editEmpleado}
-      />
+      {isAdmin && (
+        <NuevoEmpleadoModal
+          open={modalOpen}
+          onClose={closeModal}
+          onSuccess={() => void load()}
+          editEmpleado={editEmpleado}
+        />
+      )}
 
       {loading ? (
         <p className="text-sm text-neutral-600">Cargando…</p>
@@ -134,8 +121,8 @@ export default function EmpleadosPage() {
               data={rows}
               tipo="empleado"
               onView={verVentasEmpleado}
-              onEdit={openEdit}
-              onDelete={handleDelete}
+              onEdit={isAdmin ? openEdit : undefined}
+              onDelete={isAdmin ? handleDelete : undefined}
             />
           </div>
         </div>

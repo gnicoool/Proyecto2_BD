@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Link, Navigate, useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { apiClient } from "../../lib/apiClient";
-import { ROUTES } from "../../lib/authRoutes";
 import { useAuth } from "../../hooks/useAuth";
 import type { VentaCabecera, VentaTablaRow } from "../../types/venta";
 import { VentasTable } from "../../components/personas/tableventas";
@@ -29,7 +28,7 @@ function parseEmpleadoVentasFilter(searchParams: URLSearchParams): {
 }
 
 export default function VentasPage() {
-  const { user, isAdmin } = useAuth();
+  const { user } = useAuth();
   const [searchParams] = useSearchParams();
   const filtroEmpleado = useMemo(() => parseEmpleadoVentasFilter(searchParams), [searchParams]);
 
@@ -56,13 +55,7 @@ export default function VentasPage() {
     void loadVentas();
   }, [loadVentas]);
 
-  if (!user) {
-    return null;
-  }
-
-  if (!isAdmin) {
-    return <Navigate to={ROUTES.misVentas} replace />;
-  }
+  if (!user) return null;
 
   const rowsFiltradas = useMemo(() => {
     if (!filtroEmpleado.nit) return rows;
