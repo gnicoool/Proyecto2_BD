@@ -20,11 +20,12 @@ from schemas.producto import ProductoGet
 router = APIRouter(prefix="/compras", tags=["Compras"])
 
 _ROLES_COMPRAS = ("Admin", "Bodeguero")
+_ROLES_COMPRAS_LECTURA = ("Admin", "Bodeguero", "Contador")
 
 
 @router.get("/", response_model=list[CompraCabeceraListaOut])
 def list_compras(
-    _: dict = Depends(require_rol(*_ROLES_COMPRAS)),
+    _: dict = Depends(require_rol(*_ROLES_COMPRAS_LECTURA)),
     db: Session = Depends(get_session),
 ):
     compras = (
@@ -81,7 +82,7 @@ def productos_por_proveedor(
 @router.get("/{id_compra}/detalle", response_model=CompraDetalleOut)
 def get_compra_detalle(
     id_compra: int,
-    _: dict = Depends(require_rol(*_ROLES_COMPRAS)),
+    _: dict = Depends(require_rol(*_ROLES_COMPRAS_LECTURA)),
     db: Session = Depends(get_session),
 ):
     compra = (

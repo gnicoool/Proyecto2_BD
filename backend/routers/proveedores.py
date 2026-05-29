@@ -3,7 +3,7 @@ from sqlalchemy import func, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from auth_deps import require_admin_nit
+from auth_deps import require_admin_nit, require_rol
 from orm.database import get_session
 from orm.models import Compra, Proveedor as ProveedorModel
 from schemas.proveedor import ProveedorCreate, ProveedorDelete, ProveedorGet, ProveedorUpdate
@@ -28,7 +28,7 @@ def _to_get(p: ProveedorModel, total: int) -> ProveedorGet:
 
 @router.get("/", response_model=list[ProveedorGet])
 def get_proveedores(
-    _: str = Depends(require_admin_nit),
+    _: dict = Depends(require_rol("Admin", "Bodeguero", "Supervisor")),
     include_inactive: bool = Query(False),
     db: Session = Depends(get_session),
 ):

@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from auth_deps import require_rol
 from orm.database import get_session
 from orm.models import Marca
 from schemas.marca import MarcaCreate, MarcaDelete, MarcaGet
@@ -15,7 +16,11 @@ def get_marcas(db: Session = Depends(get_session)):
 
 
 @router.post("/", response_model=MarcaGet, status_code=201)
-def create_marca(data: MarcaCreate, db: Session = Depends(get_session)):
+def create_marca(
+    data: MarcaCreate,
+    _: dict = Depends(require_rol("Admin")),
+    db: Session = Depends(get_session),
+):
     marca = Marca(nombre=data.nombre)
     db.add(marca)
     try:
@@ -31,6 +36,7 @@ def create_marca(data: MarcaCreate, db: Session = Depends(get_session)):
 def delete_marca(
     id_marca: int,
     permanent: bool = Query(False, description="If true, DELETE row; if false, soft delete."),
+    _: dict = Depends(require_rol("Admin")),
     db: Session = Depends(get_session),
 ):
     marca = db.query(Marca).filter(Marca.id_marca == id_marca).first()

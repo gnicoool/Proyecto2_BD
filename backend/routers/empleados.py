@@ -4,7 +4,7 @@ from sqlalchemy import func, text
 from sqlalchemy.exc import DBAPIError, IntegrityError
 from sqlalchemy.orm import Session, joinedload
 
-from auth_deps import require_admin_nit
+from auth_deps import require_admin_nit, require_rol
 from constants import ADMIN_ROLE_NAME
 from orm.database import get_session
 from orm.models import Rol, Usuario, Venta
@@ -32,7 +32,7 @@ def _empleado_to_get(u: Usuario, nombre_rol: str, total_ventas: int) -> Empleado
 
 @router.get("/", response_model=list[EmpleadoGet])
 def list_empleados(
-    _: str = Depends(require_admin_nit),
+    _: dict = Depends(require_rol("Admin", "Supervisor")),
     include_inactive: bool = Query(False),
     db: Session = Depends(get_session),
 ):
