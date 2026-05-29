@@ -1,6 +1,11 @@
-from fastapi import APIRouter
+from datetime import datetime
+
+from fastapi import APIRouter, Depends
+from sqlalchemy import text
+from sqlalchemy.orm import Session
 
 from database import get_db
+from orm.database import get_session
 from schemas.informes import (
     CompraPorMesOut,
     ProductoCatalogoVistaOut,
@@ -10,6 +15,7 @@ from schemas.informes import (
     VentaPorCategoriaOut,
     VentaPorEmpleadoOut,
     VentaPorMesSubqueryOut,
+    VentaRangoOut,
 )
 
 router = APIRouter(prefix="/informes", tags=["Informes"])
@@ -128,24 +134,35 @@ def ultimas_lineas_venta():
 
 
 @router.get("/top-productos-vendidos", response_model=list[TopProductoVendidoOut])
-def top_productos_vendidos():
-    """Productos mejores vendidos"""
-    with get_db() as cur:
-        cur.execute(
-            """
-            SELECT
-                p.id_producto,
-                p.nombre,
-                SUM(vp.cantidad_venta)::int AS total_unidades_vendidas,
-                SUM(vp.cantidad_venta * p.precio_venta)::numeric AS costo_aproximado
-            FROM Venta_Producto vp
-            INNER JOIN Producto p ON p.id_producto = vp.id_producto
-            GROUP BY p.id_producto, p.nombre
-            ORDER BY total_unidades_vendidas DESC
-            LIMIT 25
-            """
+def top_productos_vendidos(limite: int = 25, db: Session = Depends(get_session)):
+    """Top productos más vendidos — invoca SELECT * FROM sp_top_productos(:limite)"""
+    rows = db.execute(
+        text("SELECT * FROM top_productos(:limite)"),
+        {"limite": limite},
+    ).mappings().all()
+    return [
+        TopProductoVendidoOut(
+            id_producto=r["id_producto"],
+            nombre=r["nombre_producto"],
+            total_unidades_vendidas=int(r["total_vendido"]),
+            costo_aproximado=r["ingresos_total"],
         )
-        return cur.fetchall()
+        for r in rows
+    ]
+
+
+@router.get("/ventas-rango", response_model=list[VentaRangoOut])
+def ventas_por_rango(
+    fecha_inicio: datetime,
+    fecha_fin: datetime,
+    db: Session = Depends(get_session),
+):
+    """Reporte de ventas por rango de fecha — invoca SELECT * FROM sp_reporte_ventas(:inicio, :fin)"""
+    rows = db.execute(
+        text("SELECT * FROM reporte_ventas(:inicio, :fin)"),
+        {"inicio": fecha_inicio, "fin": fecha_fin},
+    ).mappings().all()
+    return [dict(r) for r in rows]
 
 
 @router.get("/compras-por-mes", response_model=list[CompraPorMesOut])

@@ -1,62 +1,54 @@
-from fastapi import APIRouter, HTTPException, Query
-import psycopg2
+from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import Session
 
-from database import get_db
-from schemas.marca import MarcaCreate, MarcaGet, MarcaDelete
+from orm.database import get_session
+from orm.models import Marca
+from schemas.marca import MarcaCreate, MarcaDelete, MarcaGet
 
 router = APIRouter(prefix="/marcas", tags=["Marcas"])
 
 
 @router.get("/", response_model=list[MarcaGet])
-def get_marcas():
-    with get_db() as cur:
-        cur.execute("SELECT * FROM Marca ORDER BY id_marca")
-        return cur.fetchall()
+def get_marcas(db: Session = Depends(get_session)):
+    return db.query(Marca).order_by(Marca.id_marca).all()
 
 
 @router.post("/", response_model=MarcaGet, status_code=201)
-def create_marca (data: MarcaCreate):
-    with get_db() as cur:
-        cur.execute(
-            "INSERT INTO Marca (nombre) VALUES (%s) RETURNING *",
-            (data.nombre,),
-        )
-        return cur.fetchone()
+def create_marca(data: MarcaCreate, db: Session = Depends(get_session)):
+    marca = Marca(nombre=data.nombre)
+    db.add(marca)
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(status_code=409, detail="Ya existe una marca con ese nombre")
+    db.refresh(marca)
+    return marca
 
 
 @router.delete("/{id_marca}", response_model=MarcaDelete)
 def delete_marca(
     id_marca: int,
-    permanent: bool = Query(
-        False,
-        description="If true, DELETE row; if false, set activo = false (soft delete).",
-    ),
+    permanent: bool = Query(False, description="If true, DELETE row; if false, soft delete."),
+    db: Session = Depends(get_session),
 ):
-    with get_db() as cur:
-        cur.execute(
-            "SELECT id_marca FROM Marca WHERE id_marca = %s",
-            (id_marca,),
-        )
-        if not cur.fetchone():
-            raise HTTPException(status_code=404, detail="Marca no encontrada")
+    marca = db.query(Marca).filter(Marca.id_marca == id_marca).first()
+    if not marca:
+        raise HTTPException(status_code=404, detail="Marca no encontrada")
 
-        if permanent:
-            try:
-                cur.execute("DELETE FROM Marca WHERE id_marca = %s", (id_marca,))
-            except psycopg2.IntegrityError:
-                raise HTTPException(
-                    status_code=409,
-                    detail="No se puede eliminar: hay productos que usan esta marca",
-                )
-            return MarcaDelete(accion="eliminado", id_marca=id_marca, activo=None)
+    if permanent:
+        try:
+            db.delete(marca)
+            db.commit()
+        except IntegrityError:
+            db.rollback()
+            raise HTTPException(
+                status_code=409,
+                detail="No se puede eliminar: hay productos que usan esta marca",
+            )
+        return MarcaDelete(accion="eliminado", id_marca=id_marca, activo=None)
 
-        cur.execute(
-            "UPDATE Marca SET activo = false WHERE id_marca = %s RETURNING activo",
-            (id_marca,),
-        )
-        row = cur.fetchone()
-        return MarcaDelete(
-            accion="desactivado",
-            id_marca=id_marca,
-            activo=row["activo"],
-        )
+    marca.activo = False
+    db.commit()
+    return MarcaDelete(accion="desactivado", id_marca=id_marca, activo=False)

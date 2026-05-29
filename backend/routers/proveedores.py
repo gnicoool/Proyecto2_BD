@@ -1,59 +1,70 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy import func, text
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import Session
 
 from auth_deps import require_admin_nit
-from database import get_db
+from orm.database import get_session
+from orm.models import Compra, Proveedor as ProveedorModel
 from schemas.proveedor import ProveedorCreate, ProveedorDelete, ProveedorGet, ProveedorUpdate
 
 router = APIRouter(prefix="/proveedores", tags=["Proveedores"])
 
 
+def _total_compras(db: Session, nit: str) -> int:
+    return db.query(func.count(Compra.id_compra)).filter(Compra.nit_proveedor == nit).scalar() or 0
+
+
+def _to_get(p: ProveedorModel, total: int) -> ProveedorGet:
+    return ProveedorGet(
+        nit_proveedor=p.nit_proveedor,
+        nombre=p.nombre,
+        correo=p.correo,
+        tel_proveedor=p.tel_proveedor,
+        activo=p.activo,
+        total_compras=total,
+    )
+
+
 @router.get("/", response_model=list[ProveedorGet])
 def get_proveedores(
     _: str = Depends(require_admin_nit),
-    include_inactive: bool = Query(False, description="Include suppliers marked inactive"),
+    include_inactive: bool = Query(False),
+    db: Session = Depends(get_session),
 ):
-    with get_db() as cur:
-        if include_inactive:
-            cur.execute(
-                """
-                SELECT p.nit_proveedor, p.nombre, p.correo, p.tel_proveedor, p.activo,
-                       COUNT(c.id_compra)::int AS total_compras
-                FROM Proveedor p
-                LEFT JOIN Compra c ON c.nit_proveedor = p.nit_proveedor
-                GROUP BY p.nit_proveedor, p.nombre, p.correo, p.tel_proveedor, p.activo
-                ORDER BY p.nit_proveedor
-                """,
-            )
-        else:
-            cur.execute(
-                """
-                SELECT p.nit_proveedor, p.nombre, p.correo, p.tel_proveedor, p.activo,
-                       COUNT(c.id_compra)::int AS total_compras
-                FROM Proveedor p
-                LEFT JOIN Compra c ON c.nit_proveedor = p.nit_proveedor
-                WHERE p.activo = true
-                GROUP BY p.nit_proveedor, p.nombre, p.correo, p.tel_proveedor, p.activo
-                ORDER BY p.nit_proveedor
-                """,
-            )
-        return cur.fetchall()
+    q = db.query(
+        ProveedorModel,
+        func.count(Compra.id_compra).label("total_compras"),
+    ).outerjoin(Compra, Compra.nit_proveedor == ProveedorModel.nit_proveedor)\
+     .group_by(ProveedorModel.nit_proveedor)\
+     .order_by(ProveedorModel.nit_proveedor)
+
+    if not include_inactive:
+        q = q.filter(ProveedorModel.activo == True)
+
+    return [_to_get(p, total) for p, total in q.all()]
 
 
 @router.post("/", response_model=ProveedorGet, status_code=201)
 def create_proveedor(
     data: ProveedorCreate,
     _: str = Depends(require_admin_nit),
+    db: Session = Depends(get_session),
 ):
-    with get_db() as cur:
-        cur.execute(
-            """
-            INSERT INTO Proveedor (nit_proveedor, nombre, correo, tel_proveedor, activo)
-            VALUES (%s, %s, %s, %s, true)
-            RETURNING nit_proveedor, nombre, correo, tel_proveedor, activo, 0::int AS total_compras
-            """,
-            (data.nit_proveedor.strip(), data.nombre, data.correo, data.tel_proveedor),
-        )
-        return cur.fetchone()
+    proveedor = ProveedorModel(
+        nit_proveedor=data.nit_proveedor.strip(),
+        nombre=data.nombre,
+        correo=data.correo,
+        tel_proveedor=data.tel_proveedor,
+        activo=True,
+    )
+    db.add(proveedor)
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(status_code=409, detail="Ya existe un proveedor con ese NIT")
+    return _to_get(proveedor, 0)
 
 
 @router.patch("/{nit_proveedor}", response_model=ProveedorGet)
@@ -61,68 +72,42 @@ def update_proveedor(
     nit_proveedor: str,
     data: ProveedorUpdate,
     _: str = Depends(require_admin_nit),
+    db: Session = Depends(get_session),
 ):
     nit = nit_proveedor.strip()
     payload = data.model_dump(exclude_unset=True)
     if not payload:
         raise HTTPException(status_code=400, detail="No fields to update")
 
-    columns = []
-    values: list = []
-    for key in ("nombre", "correo", "tel_proveedor", "activo"):
-        if key in payload:
-            columns.append(f"{key} = %s")
-            values.append(payload[key])
-    values.append(nit)
+    proveedor = db.query(ProveedorModel).filter(ProveedorModel.nit_proveedor == nit).first()
+    if not proveedor:
+        raise HTTPException(status_code=404, detail="Proveedor not found")
 
-    with get_db() as cur:
-        cur.execute(
-            f"""UPDATE Proveedor
-                SET {', '.join(columns)}
-                WHERE nit_proveedor = %s
-                RETURNING nit_proveedor, nombre, correo, tel_proveedor, activo""",
-            values,
-        )
-        row = cur.fetchone()
-        if not row:
-            raise HTTPException(status_code=404, detail="Proveedor not found")
-        cur.execute("SELECT COUNT(*)::int AS total_compras FROM Compra WHERE nit_proveedor = %s", (nit,))
-        row["total_compras"] = cur.fetchone()["total_compras"]
-        return row
+    for key, value in payload.items():
+        setattr(proveedor, key, value)
+
+    db.commit()
+    db.refresh(proveedor)
+    return _to_get(proveedor, _total_compras(db, nit))
 
 
 @router.delete("/{nit_proveedor}", response_model=ProveedorDelete)
 def delete_proveedor(
     nit_proveedor: str,
     _: str = Depends(require_admin_nit),
+    db: Session = Depends(get_session),
 ):
     nit = nit_proveedor.strip()
-    with get_db() as cur:
-        cur.execute(
-            "SELECT nit_proveedor FROM Proveedor WHERE nit_proveedor = %s",
-            (nit,),
-        )
-        if not cur.fetchone():
-            raise HTTPException(status_code=404, detail="Proveedor not found")
+    proveedor = db.query(ProveedorModel).filter(ProveedorModel.nit_proveedor == nit).first()
+    if not proveedor:
+        raise HTTPException(status_code=404, detail="Proveedor not found")
 
-        cur.execute(
-            "SELECT COUNT(*) AS c FROM Compra WHERE nit_proveedor = %s",
-            (nit,),
-        )
-        compras = cur.fetchone()["c"]
+    total = _total_compras(db, nit)
+    if total == 0:
+        db.delete(proveedor)
+        db.commit()
+        return ProveedorDelete(accion="eliminado", nit_proveedor=nit, activo=None)
 
-        if compras == 0:
-            cur.execute("DELETE FROM Proveedor WHERE nit_proveedor = %s RETURNING nit_proveedor", (nit,))
-            cur.fetchone()
-            return ProveedorDelete(accion="eliminado", nit_proveedor=nit, activo=None)
-
-        cur.execute(
-            "UPDATE Proveedor SET activo = false WHERE nit_proveedor = %s RETURNING nit_proveedor, activo",
-            (nit,),
-        )
-        row = cur.fetchone()
-        return ProveedorDelete(
-            accion="desactivado",
-            nit_proveedor=row["nit_proveedor"],
-            activo=row["activo"],
-        )
+    proveedor.activo = False
+    db.commit()
+    return ProveedorDelete(accion="desactivado", nit_proveedor=nit, activo=False)

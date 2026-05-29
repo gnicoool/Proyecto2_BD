@@ -58,3 +58,11 @@ class VentaPorEmpleadoOut(BaseModel):
     empleado_nombre: str | None
     num_ventas: int
     costo_total: Decimal
+
+
+class VentaRangoOut(BaseModel):
+    id_venta: int
+    fecha: datetime
+    total: Decimal
+    cliente: str | None
+    empleado: str | None

@@ -1,112 +1,90 @@
-import psycopg2
 from passlib.hash import bcrypt
 from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy import func, text
+from sqlalchemy.exc import DBAPIError, IntegrityError
+from sqlalchemy.orm import Session, joinedload
 
 from auth_deps import require_admin_nit
 from constants import ADMIN_ROLE_NAME
-from database import get_db
+from orm.database import get_session
+from orm.models import Rol, Usuario, Venta
 from schemas.empleado import EmpleadoCreate, EmpleadoDelete, EmpleadoGet, EmpleadoUpdate
 
 router = APIRouter(prefix="/empleados", tags=["Empleados"])
 
 
-def _is_admin_role(nombre_rol: str | None) -> bool:
-    if not nombre_rol:
-        return False
-    return nombre_rol.strip().lower() == ADMIN_ROLE_NAME
+def _is_admin(nombre_rol: str | None) -> bool:
+    return (nombre_rol or "").strip().lower() == ADMIN_ROLE_NAME
+
+
+def _empleado_to_get(u: Usuario, nombre_rol: str, total_ventas: int) -> EmpleadoGet:
+    return EmpleadoGet(
+        nit_empleado=u.nit_empleado,
+        nombre=u.nombre,
+        tel_empleado=u.tel_empleado,
+        correo=u.correo,
+        id_rol=u.id_rol,
+        nombre_rol=nombre_rol,
+        activo=u.activo,
+        total_ventas=total_ventas,
+    )
 
 
 @router.get("/", response_model=list[EmpleadoGet])
 def list_empleados(
     _: str = Depends(require_admin_nit),
-    include_inactive: bool = Query(False, description="Include deactivated users"),
+    include_inactive: bool = Query(False),
+    db: Session = Depends(get_session),
 ):
-    with get_db() as cur:
-        if include_inactive:
-            cur.execute(
-                """
-                SELECT u.nit_empleado, u.nombre, u.tel_empleado, u.correo, u.activo, u.id_rol,
-                       r.nombre AS nombre_rol,
-                       COUNT(v.id_venta)::int AS total_ventas
-                FROM Usuario u
-                JOIN Rol r ON r.id_rol = u.id_rol
-                LEFT JOIN Venta v ON v.nit_empleado = u.nit_empleado
-                GROUP BY u.nit_empleado, u.nombre, u.tel_empleado, u.correo, u.activo, u.id_rol, r.nombre
-                ORDER BY u.nit_empleado
-                """
-            )
-        else:
-            cur.execute(
-                """
-                SELECT u.nit_empleado, u.nombre, u.tel_empleado, u.correo, u.activo, u.id_rol,
-                       r.nombre AS nombre_rol,
-                       COUNT(v.id_venta)::int AS total_ventas
-                FROM Usuario u
-                JOIN Rol r ON r.id_rol = u.id_rol
-                LEFT JOIN Venta v ON v.nit_empleado = u.nit_empleado
-                WHERE u.activo = true
-                GROUP BY u.nit_empleado, u.nombre, u.tel_empleado, u.correo, u.activo, u.id_rol, r.nombre
-                ORDER BY u.nit_empleado
-                """
-            )
-        return cur.fetchall()
+    q = (
+        db.query(Usuario, Rol.nombre.label("nombre_rol"), func.count(Venta.id_venta).label("total_ventas"))
+        .join(Rol, Usuario.id_rol == Rol.id_rol)
+        .outerjoin(Venta, Venta.nit_empleado == Usuario.nit_empleado)
+        .group_by(Usuario.nit_empleado, Rol.nombre)
+        .order_by(Usuario.nit_empleado)
+    )
+    if not include_inactive:
+        q = q.filter(Usuario.activo == True)
+    rows = q.all()
+    return [_empleado_to_get(u, nombre_rol, total) for u, nombre_rol, total in rows]
 
 
 @router.post("/", response_model=EmpleadoGet, status_code=201)
 def create_empleado(
     data: EmpleadoCreate,
     _: str = Depends(require_admin_nit),
+    db: Session = Depends(get_session),
 ):
     pwd_hash = bcrypt.hash(data.contrasena)
+    nit = data.nit_empleado.strip()
     try:
-        with get_db() as cur:
-            cur.execute("SELECT id_rol FROM Rol WHERE id_rol = %s", (data.id_rol,))
-            if not cur.fetchone():
-                raise HTTPException(status_code=400, detail="Invalid id_rol")
-            cur.execute(
-                """
-                INSERT INTO Usuario (nit_empleado, nombre, tel_empleado, correo, contrasena, activo, id_rol)
-                VALUES (%s, %s, %s, %s, %s, true, %s)
-                RETURNING nit_empleado, nombre, tel_empleado, correo, activo, id_rol, 0::int AS total_ventas
-                """,
-                (
-                    data.nit_empleado.strip(),
-                    data.nombre,
-                    data.tel_empleado,
-                    data.correo,
-                    pwd_hash,
-                    data.id_rol,
-                ),
-            )
-            row = cur.fetchone()
-            cur.execute(
-                "SELECT nombre FROM Rol WHERE id_rol = %s",
-                (row["id_rol"],),
-            )
-            r = cur.fetchone()
-            row["nombre_rol"] = (r["nombre"] if r else "") or ""
-            return row
-    except psycopg2.IntegrityError:
-        raise HTTPException(status_code=409, detail="Duplicate nit_empleado or invalid role reference")
+        db.execute(# Crear un empleado usando el procedure de gestionar empleado
+            text("""
+                CALL sp_gestionar_empleado(
+                    :accion, :nit, :nombre, :tel, :correo, :cont, :id_rol
+                )
+            """),
+            {
+                "accion": "CREAR",
+                "nit": nit,
+                "nombre": data.nombre,
+                "tel": data.tel_empleado,
+                "correo": data.correo,
+                "cont": pwd_hash,
+                "id_rol": data.id_rol,
+            },
+        )
+        db.commit()
+    except DBAPIError as e:
+        raise HTTPException(status_code=400, detail=str(e.orig))
 
-
-def _load_user_rol(cur, nit: str):
-    cur.execute(
-        """
-        SELECT u.nit_empleado, u.activo, u.id_rol, LOWER(TRIM(r.nombre)) AS rol_nombre
-        FROM Usuario u
-        JOIN Rol r ON r.id_rol = u.id_rol
-        WHERE u.nit_empleado = %s
-        """,
-        (nit,),
+    usuario = (
+        db.query(Usuario)
+        .options(joinedload(Usuario.rol))
+        .filter(Usuario.nit_empleado == nit)
+        .first()
     )
-    return cur.fetchone()
-
-
-def _rol_name_for_id(cur, id_rol: int) -> str | None:
-    cur.execute("SELECT LOWER(TRIM(nombre)) AS n FROM Rol WHERE id_rol = %s", (id_rol,))
-    r = cur.fetchone()
-    return r["n"] if r else None
+    return _empleado_to_get(usuario, usuario.rol.nombre, 0)
 
 
 @router.patch("/{nit_empleado}", response_model=EmpleadoGet)
@@ -114,95 +92,77 @@ def update_empleado(
     nit_empleado: str,
     data: EmpleadoUpdate,
     _: str = Depends(require_admin_nit),
+    db: Session = Depends(get_session),
 ):
     nit = nit_empleado.strip()
     payload = data.model_dump(exclude_unset=True)
     if not payload:
         raise HTTPException(status_code=400, detail="No fields to update")
 
-    with get_db() as cur:
-        user = _load_user_rol(cur, nit)
-        if not user:
-            raise HTTPException(status_code=404, detail="User not found")
+    usuario = (
+        db.query(Usuario)
+        .options(joinedload(Usuario.rol))
+        .filter(Usuario.nit_empleado == nit)
+        .first()
+    )
+    if not usuario:
+        raise HTTPException(status_code=404, detail="User not found")
 
-        if "id_rol" in payload:
-            new_rol = _rol_name_for_id(cur, payload["id_rol"])
-            if new_rol is None:
-                raise HTTPException(status_code=400, detail="Invalid id_rol")
-            if _is_admin_role(user["rol_nombre"]) and new_rol != ADMIN_ROLE_NAME:
-                raise HTTPException(
-                    status_code=403,
-                    detail="Cannot change admin role to a non-admin role",
-                )
+    if "id_rol" in payload:
+        nuevo_rol = db.query(Rol).filter(Rol.id_rol == payload["id_rol"]).first()
+        if not nuevo_rol:
+            raise HTTPException(status_code=400, detail="Invalid id_rol")
+        if _is_admin(usuario.rol.nombre) and not _is_admin(nuevo_rol.nombre):
+            raise HTTPException(status_code=403, detail="Cannot change admin role to a non-admin role")
 
-        if _is_admin_role(user["rol_nombre"]) and payload.get("activo") is False:
-            raise HTTPException(status_code=403, detail="Cannot deactivate admin users")
+    if _is_admin(usuario.rol.nombre) and payload.get("activo") is False:
+        raise HTTPException(status_code=403, detail="Cannot deactivate admin users")
 
-        columns = []
-        values: list = []
-        for key in ("nombre", "tel_empleado", "correo", "activo", "id_rol"):
-            if key in payload:
-                columns.append(f"{key} = %s")
-                values.append(payload[key])
-        values.append(nit)
+    for key, value in payload.items():
+        setattr(usuario, key, value)
 
-        cur.execute(
-            f"""UPDATE Usuario
-                SET {', '.join(columns)}
-                WHERE nit_empleado = %s
-                RETURNING nit_empleado, nombre, tel_empleado, correo, activo, id_rol""",
-            values,
-        )
-        row = cur.fetchone()
-        cur.execute("SELECT COUNT(*)::int AS total_ventas FROM Venta WHERE nit_empleado = %s", (nit,))
-        row["total_ventas"] = cur.fetchone()["total_ventas"]
-        cur.execute("SELECT nombre FROM Rol WHERE id_rol = %s", (row["id_rol"],))
-        r = cur.fetchone()
-        row["nombre_rol"] = (r["nombre"] if r else "") or ""
-        return row
+    db.commit()
+    db.refresh(usuario)
+
+    total_ventas = db.query(func.count(Venta.id_venta)).filter(Venta.nit_empleado == nit).scalar() or 0
+    rol_nombre = db.query(Rol.nombre).filter(Rol.id_rol == usuario.id_rol).scalar() or ""
+    return _empleado_to_get(usuario, rol_nombre, total_ventas)
 
 
 @router.delete("/{nit_empleado}", response_model=EmpleadoDelete)
 def delete_empleado(
     nit_empleado: str,
     _: str = Depends(require_admin_nit),
+    db: Session = Depends(get_session),
 ):
     nit = nit_empleado.strip()
-    with get_db() as cur:
-        cur.execute(
-            """
-            SELECT u.nit_empleado, u.activo, r.nombre AS nombre_rol
-            FROM Usuario u
-            JOIN Rol r ON r.id_rol = u.id_rol
-            WHERE u.nit_empleado = %s
-            """,
-            (nit,),
-        )
-        user = cur.fetchone()
-        if not user:
-            raise HTTPException(status_code=404, detail="User not found")
+    usuario = (
+        db.query(Usuario)
+        .options(joinedload(Usuario.rol))
+        .filter(Usuario.nit_empleado == nit)
+        .first()
+    )
+    if not usuario:
+        raise HTTPException(status_code=404, detail="User not found")
 
-        if _is_admin_role(user["nombre_rol"]):
-            raise HTTPException(status_code=403, detail="Admin users cannot be deleted or deactivated")
+    if _is_admin(usuario.rol.nombre):
+        raise HTTPException(status_code=403, detail="Admin users cannot be deleted or deactivated")
 
-        cur.execute(
-            "SELECT COUNT(*) AS c FROM Venta WHERE nit_empleado = %s",
-            (nit,),
-        )
-        ventas = cur.fetchone()["c"]
+    total_ventas = db.query(func.count(Venta.id_venta)).filter(Venta.nit_empleado == nit).scalar() or 0
 
-        if ventas == 0:
-            cur.execute("DELETE FROM Usuario WHERE nit_empleado = %s RETURNING nit_empleado", (nit,))
-            cur.fetchone()
-            return EmpleadoDelete(accion="eliminado", nit_empleado=nit, activo=None)
+    if total_ventas == 0:
+        db.delete(usuario)
+        db.commit()
+        return EmpleadoDelete(accion="eliminado", nit_empleado=nit, activo=None)
 
-        cur.execute(
-            "UPDATE Usuario SET activo = false WHERE nit_empleado = %s RETURNING nit_empleado, activo",
-            (nit,),
+    # Desactivar empleado con ventas usando el procedure de gestionar empleado
+    try:
+        db.execute(
+            text("CALL sp_gestionar_empleado(:accion, :nit, NULL, NULL, NULL, NULL, NULL)"),
+            {"accion": "DESACTIVAR", "nit": nit},
         )
-        row = cur.fetchone()
-        return EmpleadoDelete(
-            accion="desactivado",
-            nit_empleado=row["nit_empleado"],
-            activo=row["activo"],
-        )
+        db.commit()
+    except DBAPIError as e:
+        raise HTTPException(status_code=400, detail=str(e.orig))
+
+    return EmpleadoDelete(accion="desactivado", nit_empleado=nit, activo=False)
