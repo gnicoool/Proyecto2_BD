@@ -21,7 +21,6 @@ def get_cliente(id_cliente: int, db: Session = Depends(get_session)):
     return cliente
 
 
-# ORM — CREATE
 @router.post("/", response_model=ClienteGet, status_code=201)
 def create_cliente(data: ClienteCreate, db: Session = Depends(get_session)):
     cliente = Cliente(nombre=data.nombre, nit=data.nit)

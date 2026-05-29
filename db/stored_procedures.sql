@@ -95,11 +95,13 @@ CREATE TRIGGER trg_validar_proveedor_activo
 -- =========================
 
 /* sp_registrar_venta
-Registra una venta completa usando transaccion,usando SAVEPOINT y ROLLBACK
-Recibe cliente, empleado y un arreglo JSON de productos porque la cantidad de lineas varia en cada venta
-Calcula el total con el precio_venta del catalogo, inserta Venta y Venta_Producto, y descuenta stock
-Antes de insert se crea el savepoint y si falla hace ROLLBACK TO SAVEPOINT
-Devuelve el id de la venta y el total, este procedure lo usa rol_vendedor y rol_admin.
+Registra una venta completa: validacion de stock y precios, luego inserts y descuento de inventario.
+Recibe cliente, empleado y un arreglo JSON de productos (la cantidad de lineas varia en cada venta).
+Devuelve el id de la venta y el total. Lo usan rol_vendedor y rol_admin.
+
+ROLLBACK: PL/pgSQL no permite SAVEPOINT ni ROLLBACK TO SAVEPOINT dentro de un procedure, por lo que 
+el equivalente es un bloque BEGIN...EXCEPTION...END, si falla,se revierten solo los cambios de ese bloque
+antes de entrar al handler, igual que un ROLLBACK TO SAVEPOINT
 */
 CREATE OR REPLACE PROCEDURE sp_registrar_venta(
     IN  p_id_cliente    INT,
@@ -118,7 +120,6 @@ DECLARE
     v_cantidad          INT;
     v_precio            DECIMAL(10,2);
     v_stock             INT;
-    v_savepoint_activo  BOOLEAN := false;
 BEGIN
     IF p_productos IS NULL OR json_array_length(p_productos) = 0 THEN
         RAISE EXCEPTION 'La venta debe incluir al menos un producto';
@@ -126,7 +127,7 @@ BEGIN
 
     p_total := 0;
 
-    -- Validacion 
+    -- Validacion
     FOR v_item IN SELECT value FROM json_array_elements(p_productos) AS t(value)
     LOOP
         v_id_producto := (v_item->>'id_producto')::INT;
@@ -157,51 +158,43 @@ BEGIN
         p_total := p_total + (v_precio * v_cantidad);
     END LOOP;
 
-    -- Si los inserts fallan regresan a este savepoint con un rollback
-    SAVEPOINT sp_venta_escritura;
-    v_savepoint_activo := true;
+    -- Uso de EXCEPTION hace rollback parcial pues no hay savepoint
+    BEGIN
+        INSERT INTO Venta (total, id_cliente, nit_empleado)
+        VALUES (p_total, p_id_cliente, p_nit_empleado)
+        RETURNING id_venta INTO p_id_venta;
 
-    INSERT INTO Venta (total, id_cliente, nit_empleado)
-    VALUES (p_total, p_id_cliente, p_nit_empleado)
-    RETURNING id_venta INTO p_id_venta;
+        FOR v_item IN SELECT value FROM json_array_elements(p_productos) AS t(value)
+        LOOP
+            v_id_producto := (v_item->>'id_producto')::INT;
+            v_cantidad    := COALESCE(
+                (v_item->>'cantidad_venta')::INT,
+                (v_item->>'cantidad')::INT
+            );
 
-    FOR v_item IN SELECT value FROM json_array_elements(p_productos) AS t(value)
-    LOOP
-        v_id_producto := (v_item->>'id_producto')::INT;
-        v_cantidad    := COALESCE(
-            (v_item->>'cantidad_venta')::INT,
-            (v_item->>'cantidad')::INT
-        );
+            INSERT INTO Venta_Producto (id_venta, id_producto, cantidad_venta)
+            VALUES (p_id_venta, v_id_producto, v_cantidad);
 
-        INSERT INTO Venta_Producto (id_venta, id_producto, cantidad_venta)
-        VALUES (p_id_venta, v_id_producto, v_cantidad);
-
-        UPDATE Producto
-        SET cant_disponible = cant_disponible - v_cantidad
-        WHERE id_producto = v_id_producto;
-    END LOOP;
-
-    RELEASE SAVEPOINT sp_venta_escritura;
-    v_savepoint_activo := false;
-
-EXCEPTION
-    WHEN OTHERS THEN
-        IF v_savepoint_activo THEN
-            ROLLBACK TO SAVEPOINT sp_venta_escritura;
-            v_savepoint_activo := false;
+            UPDATE Producto
+            SET cant_disponible = cant_disponible - v_cantidad
+            WHERE id_producto = v_id_producto;
+        END LOOP;
+    EXCEPTION
+        WHEN OTHERS THEN
             RAISE EXCEPTION 'Venta revertida. Error en escritura: %', SQLERRM;
-        END IF;
-        RAISE;
+    END;
 END;
 $$;
 
 
 /* sp_registrar_compra
-Para registrar una compra completa al proveedor, usando SAVEPOINT y ROLLBACK por si fallan los inserts
-Recibe el NIT del proveedor y un arreglo JSON de productos con cantidad y precio_compra
-Inserta Compra y Compra_Producto, aumenta stock y actualiza precio_compra del producto
-Antes de insert se crea el SAVEPOINT y si falla se hace ROLLBACK TO SAVEPOINT
-Devuelve el id de la compra y el total, este procedure lo usa rol_bodeguero y rol_admin.
+Registra una compra completa al proveedor: validacion, inserts y actualizacion de stock/precio_compra.
+Recibe el NIT del proveedor y un arreglo JSON de productos con cantidad y precio_compra.
+Devuelve el id de la compra y el total. Lo usan rol_bodeguero y rol_admin.
+
+ROLLBACK: PL/pgSQL no permite SAVEPOINT ni ROLLBACK TO SAVEPOINT dentro de un procedure, por lo que 
+el equivalente es un bloque BEGIN...EXCEPTION...END, si falla,se revierten solo los cambios de ese bloque
+antes de entrar al handler, igual que un ROLLBACK TO SAVEPOINT
 */
 CREATE OR REPLACE PROCEDURE sp_registrar_compra(
     IN  p_nit_proveedor VARCHAR(8),
@@ -218,7 +211,6 @@ DECLARE
     v_id_producto       INT;
     v_cantidad          INT;
     v_precio_compra     DECIMAL(10,2);
-    v_savepoint_activo  BOOLEAN := false;
 BEGIN
     IF p_productos IS NULL OR json_array_length(p_productos) = 0 THEN
         RAISE EXCEPTION 'La compra debe incluir al menos un producto';
@@ -257,44 +249,34 @@ BEGIN
         p_total := p_total + (v_cantidad * v_precio_compra);
     END LOOP;
 
-    -- Este es el savepoint a donde regresa si algo falla y se hace ROLLBACK
-    SAVEPOINT sp_compra_escritura;
-    v_savepoint_activo := true;
+    -- Uso de EXCEPTION hace rollback parcial pues no hay ROLLBACK TO SAVEPOINT
+    BEGIN
+        INSERT INTO Compra (total, nit_proveedor)
+        VALUES (p_total, p_nit_proveedor)
+        RETURNING id_compra INTO p_id_compra;
 
-    INSERT INTO Compra (total, nit_proveedor)
-    VALUES (p_total, p_nit_proveedor)
-    RETURNING id_compra INTO p_id_compra;
+        FOR v_item IN SELECT value FROM json_array_elements(p_productos) AS t(value)
+        LOOP
+            v_id_producto := (v_item->>'id_producto')::INT;
+            v_cantidad    := COALESCE(
+                (v_item->>'cantidad_compra')::INT,
+                (v_item->>'cantidad')::INT
+            );
+            v_precio_compra := (v_item->>'precio_compra')::DECIMAL(10,2);
 
-    FOR v_item IN SELECT value FROM json_array_elements(p_productos) AS t(value)
-    LOOP
-        v_id_producto := (v_item->>'id_producto')::INT;
-        v_cantidad    := COALESCE(
-            (v_item->>'cantidad_compra')::INT,
-            (v_item->>'cantidad')::INT
-        );
-        v_precio_compra := (v_item->>'precio_compra')::DECIMAL(10,2);
+            INSERT INTO Compra_Producto (id_compra, id_producto, cantidad_compra)
+            VALUES (p_id_compra, v_id_producto, v_cantidad);
 
-        INSERT INTO Compra_Producto (id_compra, id_producto, cantidad_compra)
-        VALUES (p_id_compra, v_id_producto, v_cantidad);
-
-        UPDATE Producto
-        SET
-            cant_disponible = cant_disponible + v_cantidad,
-            precio_compra   = v_precio_compra
-        WHERE id_producto = v_id_producto;
-    END LOOP;
-
-    RELEASE SAVEPOINT sp_compra_escritura;
-    v_savepoint_activo := false;
-
-EXCEPTION
-    WHEN OTHERS THEN
-        IF v_savepoint_activo THEN
-            ROLLBACK TO SAVEPOINT sp_compra_escritura;
-            v_savepoint_activo := false;
+            UPDATE Producto
+            SET
+                cant_disponible = cant_disponible + v_cantidad,
+                precio_compra   = v_precio_compra
+            WHERE id_producto = v_id_producto;
+        END LOOP;
+    EXCEPTION
+        WHEN OTHERS THEN
             RAISE EXCEPTION 'Compra revertida. Error en escritura: %', SQLERRM;
-        END IF;
-        RAISE;
+    END;
 END;
 $$;
 

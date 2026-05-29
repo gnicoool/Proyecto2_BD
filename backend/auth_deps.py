@@ -1,60 +1,53 @@
-from fastapi import Depends, Header, HTTPException
-from fastapi.security import HTTPBasic, HTTPBasicCredentials
-from passlib.hash import bcrypt
+import os
 
-from constants import ADMIN_ROLE_NAME
-from database import get_db
+from fastapi import Depends, HTTPException
+from fastapi.security import OAuth2PasswordBearer
+from jose import JWTError, jwt
 
-security = HTTPBasic(auto_error=False)
+_SECRET = os.getenv("JWT_SECRET")
+_ALGORITHM = "HS256"
 
-
-def require_admin_nit(x_nit_empleado: str = Header(..., alias="X-NIT-Empleado")):
-    """Permite acceso solo a usuarios activos con rol de administrador, usando NIT en header."""
-    nit = x_nit_empleado.strip()
-    if not nit:
-        raise HTTPException(status_code=401, detail="X-NIT-Empleado required")
-    with get_db() as cur:
-        cur.execute(
-            """
-            SELECT LOWER(TRIM(r.nombre)) AS rol_nombre
-            FROM Usuario u
-            JOIN Rol r ON r.id_rol = u.id_rol
-            WHERE u.nit_empleado = %s AND u.activo = true
-            """,
-            (nit,),
-        )
-        row = cur.fetchone()
-    if not row or row["rol_nombre"] != ADMIN_ROLE_NAME:
-        raise HTTPException(status_code=403, detail="Admin role required")
-    return nit
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
 
 
-def require_admin(credentials: HTTPBasicCredentials | None = Depends(security)):
-    """Permite acceso solo a usuarios activos con rol de administrador."""
-    if credentials is None or not credentials.username or not credentials.password:
-        raise HTTPException(
-            status_code=401,
-            detail="Admin HTTP Basic auth required (NIT as username, password)",
-            headers={"WWW-Authenticate": "Basic"},
-        )
-    nit = credentials.username.strip()
-    with get_db() as cur:
-        cur.execute(
-            """
-            SELECT u.contrasena, LOWER(TRIM(r.nombre)) AS rol_nombre
-            FROM Usuario u
-            JOIN Rol r ON r.id_rol = u.id_rol
-            WHERE u.nit_empleado = %s AND u.activo = true
-            """,
-            (nit,),
-        )
-        row = cur.fetchone()
-    if not row or row["rol_nombre"] != ADMIN_ROLE_NAME:
-        raise HTTPException(status_code=403, detail="Admin role required")
-    if not bcrypt.verify(credentials.password, row["contrasena"]):
-        raise HTTPException(
-            status_code=401,
-            detail="Invalid credentials",
-            headers={"WWW-Authenticate": "Basic"},
-        )
-    return nit
+def get_current_user(token: str = Depends(oauth2_scheme)) -> dict:
+    """Decodifica el JWT y retorna el payload: sub, nombre, id_rol, rol."""
+    try:
+        payload = jwt.decode(token, _SECRET, algorithms=[_ALGORITHM])
+        if not payload.get("sub"):
+            raise ValueError("Token sin sujeto")
+        return payload
+    except (JWTError, ValueError):
+        raise HTTPException(status_code=401, detail="Token inválido o expirado")
+
+
+def require_rol(*roles: str):
+    """
+    Factory que retorna una dependencia FastAPI.
+    Verifica que el usuario autenticado tenga uno de los roles permitidos.
+
+    Uso:  Depends(require_rol("Admin", "Vendedor"))
+    """
+    def dependency(user: dict = Depends(get_current_user)) -> dict:
+        if user.get("rol") not in roles:
+            raise HTTPException(
+                status_code=403,
+                detail=f"Acceso denegado. Se requiere rol: {', '.join(roles)}",
+            )
+        return user
+    return dependency
+
+
+# Alias de compatibilidad para no romper routers existentes en esta transicion
+def require_admin_nit(user: dict = Depends(get_current_user)) -> str:
+    """Acepta cualquier token JWT válido de Admin y retorna el NIT."""
+    if user.get("rol") != "Admin":
+        raise HTTPException(status_code=403, detail="Se requiere rol Admin")
+    return user["sub"]
+
+
+def require_admin(user: dict = Depends(get_current_user)) -> str:
+    """Acepta cualquier token JWT válido de Admin y retorna el NIT."""
+    if user.get("rol") != "Admin":
+        raise HTTPException(status_code=403, detail="Se requiere rol Admin")
+    return user["sub"]

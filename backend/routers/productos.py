@@ -3,25 +3,37 @@ from sqlalchemy import text
 from sqlalchemy.exc import DBAPIError, IntegrityError
 from sqlalchemy.orm import Session
 
+from auth_deps import require_rol
 from orm.database import get_session
 from orm.models import Producto, Proveedor, ProductoProveedor
 from schemas.producto import ProductoCreate, ProductoDelete, ProductoGet, ProductoUpdate
 
 router = APIRouter(prefix="/productos", tags=["Productos"])
 
+_ROLES_GESTION = ("Admin", "Bodeguero", "Supervisor")
+
+
+def _to_get(p: Producto) -> ProductoGet:
+    return ProductoGet(
+        id_producto=p.id_producto,
+        nombre=p.nombre,
+        descripcion=p.descripcion,
+        precio_venta=p.precio_venta,
+        precio_compra=p.precio_compra,
+        cant_disponible=p.cant_disponible,
+        id_categoria=p.id_categoria,
+        activo=p.activo,
+        id_marca=p.id_marca,
+    )
+
+
 @router.get("/", response_model=list[ProductoGet])
 def get_productos(db: Session = Depends(get_session)):
     stmt = text("""
         SELECT
-            pr.id_producto,
-            pr.nombre,
-            pr.descripcion,
-            pr.precio_venta,
-            pr.precio_compra,
-            pr.cant_disponible,
-            pr.id_categoria,
-            pr.activo,
-            pr.id_marca,
+            pr.id_producto, pr.nombre, pr.descripcion,
+            pr.precio_venta, pr.precio_compra, pr.cant_disponible,
+            pr.id_categoria, pr.activo, pr.id_marca,
             cat.nombre AS categoria_nombre,
             COALESCE(lp_compra.proveedor_nombre, lp_link.proveedor_nombre) AS proveedor_nombre
         FROM Producto pr
@@ -50,56 +62,23 @@ def get_productos(db: Session = Depends(get_session)):
 
 @router.get("/categoria/{id_categoria}", response_model=list[ProductoGet])
 def get_productos_by_categoria(id_categoria: int, db: Session = Depends(get_session)):
-    productos = (
-        db.query(Producto)
-        .filter(Producto.id_categoria == id_categoria)
-        .order_by(Producto.id_producto)
-        .all()
-    )
-    return [
-        ProductoGet(
-            id_producto=p.id_producto,
-            nombre=p.nombre,
-            descripcion=p.descripcion,
-            precio_venta=p.precio_venta,
-            precio_compra=p.precio_compra,
-            cant_disponible=p.cant_disponible,
-            id_categoria=p.id_categoria,
-            activo=p.activo,
-            id_marca=p.id_marca,
-        )
-        for p in productos
-    ]
+    return [_to_get(p) for p in
+            db.query(Producto).filter(Producto.id_categoria == id_categoria).order_by(Producto.id_producto).all()]
 
 
 @router.get("/marca/{id_marca}", response_model=list[ProductoGet])
 def get_productos_by_marca(id_marca: int, db: Session = Depends(get_session)):
-    productos = (
-        db.query(Producto)
-        .filter(Producto.id_marca == id_marca)
-        .order_by(Producto.id_producto)
-        .all()
-    )
-    return [
-        ProductoGet(
-            id_producto=p.id_producto,
-            nombre=p.nombre,
-            descripcion=p.descripcion,
-            precio_venta=p.precio_venta,
-            precio_compra=p.precio_compra,
-            cant_disponible=p.cant_disponible,
-            id_categoria=p.id_categoria,
-            activo=p.activo,
-            id_marca=p.id_marca,
-        )
-        for p in productos
-    ]
+    return [_to_get(p) for p in
+            db.query(Producto).filter(Producto.id_marca == id_marca).order_by(Producto.id_producto).all()]
 
 
 @router.post("/", response_model=ProductoGet, status_code=201)
-def create_producto(data: ProductoCreate, db: Session = Depends(get_session)):
+def create_producto(
+    data: ProductoCreate,
+    _: dict = Depends(require_rol("Admin", "Bodeguero")),
+    db: Session = Depends(get_session),
+):
     nit = (data.nit_proveedor or "").strip() or None
-
     if nit:
         prov = db.query(Proveedor).filter(Proveedor.nit_proveedor == nit).first()
         if not prov:
@@ -118,59 +97,46 @@ def create_producto(data: ProductoCreate, db: Session = Depends(get_session)):
     )
     db.add(producto)
     db.flush()
-
     if nit:
-        pp = ProductoProveedor(id_producto=producto.id_producto, nit_proveedor=nit)
-        db.merge(pp)
-
+        db.merge(ProductoProveedor(id_producto=producto.id_producto, nit_proveedor=nit))
     db.commit()
     db.refresh(producto)
-    return ProductoGet(
-        id_producto=producto.id_producto,
-        nombre=producto.nombre,
-        descripcion=producto.descripcion,
-        precio_venta=producto.precio_venta,
-        precio_compra=producto.precio_compra,
-        cant_disponible=producto.cant_disponible,
-        id_categoria=producto.id_categoria,
-        activo=producto.activo,
-        id_marca=producto.id_marca,
-    )
+    return _to_get(producto)
 
 
 @router.patch("/{id_producto}/toggle", response_model=ProductoGet)
-def toggle_producto(id_producto: int, activo: bool, db: Session = Depends(get_session)):
+def toggle_producto(
+    id_producto: int,
+    activo: bool,
+    _: dict = Depends(require_rol(*_ROLES_GESTION)),
+    db: Session = Depends(get_session),
+):
+    #Uso del procedure para cambio de estado del producto
     try:
-        db.execute(#Uso del procedure para cambiar el estado de un producto
+        db.execute(
             text("CALL sp_toggle_producto(:id, :activo)"),
             {"id": id_producto, "activo": activo},
         )
         db.commit()
     except DBAPIError as e:
         raise HTTPException(status_code=400, detail=str(e.orig))
-
     producto = db.query(Producto).filter(Producto.id_producto == id_producto).first()
-    return ProductoGet(
-        id_producto=producto.id_producto,
-        nombre=producto.nombre,
-        descripcion=producto.descripcion,
-        precio_venta=producto.precio_venta,
-        precio_compra=producto.precio_compra,
-        cant_disponible=producto.cant_disponible,
-        id_categoria=producto.id_categoria,
-        activo=producto.activo,
-        id_marca=producto.id_marca,
-    )
+    return _to_get(producto)
 
 
 @router.patch("/{id_producto}", response_model=ProductoGet)
-def update_producto(id_producto: int, data: ProductoUpdate, db: Session = Depends(get_session)):
+def update_producto(
+    id_producto: int,
+    data: ProductoUpdate,
+    _: dict = Depends(require_rol(*_ROLES_GESTION)),
+    db: Session = Depends(get_session),
+):
+    #Uso del procedure editar producto
     if not db.query(Producto).filter(Producto.id_producto == id_producto).first():
         raise HTTPException(status_code=404, detail="Producto no encontrado")
-
     try:
-        db.execute(#Uso del procedure para editar un producto
-            text(""" 
+        db.execute(
+            text("""
                 CALL sp_editar_producto(
                     :id_prod, :nombre, :descripcion,
                     :precio_venta, :precio_compra, :cant_disp,
@@ -191,25 +157,14 @@ def update_producto(id_producto: int, data: ProductoUpdate, db: Session = Depend
         db.commit()
     except DBAPIError as e:
         raise HTTPException(status_code=400, detail=str(e.orig))
-
-    producto = db.query(Producto).filter(Producto.id_producto == id_producto).first()
-    return ProductoGet(
-        id_producto=producto.id_producto,
-        nombre=producto.nombre,
-        descripcion=producto.descripcion,
-        precio_venta=producto.precio_venta,
-        precio_compra=producto.precio_compra,
-        cant_disponible=producto.cant_disponible,
-        id_categoria=producto.id_categoria,
-        activo=producto.activo,
-        id_marca=producto.id_marca,
-    )
+    return _to_get(db.query(Producto).filter(Producto.id_producto == id_producto).first())
 
 
 @router.delete("/{id_producto}", response_model=ProductoDelete)
 def delete_producto(
     id_producto: int,
-    permanent: bool = Query(False, description="If true, DELETE row; if false, soft delete."),
+    permanent: bool = Query(False),
+    _: dict = Depends(require_rol("Admin")),
     db: Session = Depends(get_session),
 ):
     producto = db.query(Producto).filter(Producto.id_producto == id_producto).first()
@@ -222,10 +177,7 @@ def delete_producto(
             db.commit()
         except IntegrityError:
             db.rollback()
-            raise HTTPException(
-                status_code=409,
-                detail="No se puede eliminar: el producto aparece en compras o ventas",
-            )
+            raise HTTPException(status_code=409, detail="No se puede eliminar: aparece en compras o ventas")
         return ProductoDelete(accion="eliminado", id_producto=id_producto, activo=None)
 
     producto.activo = False

@@ -1,14 +1,13 @@
 import json
-from decimal import Decimal
 
-from fastapi import APIRouter, Depends, Header, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import text
 from sqlalchemy.exc import DBAPIError
 from sqlalchemy.orm import Session, joinedload
 
-from auth_deps import require_admin
+from auth_deps import get_current_user, require_rol
 from orm.database import get_session
-from orm.models import Cliente, Producto, Usuario, Venta, VentaProducto
+from orm.models import Cliente, Venta, VentaProducto
 from schemas.venta import (
     VentaCabeceraOut,
     VentaCreate,
@@ -32,26 +31,25 @@ def _cabecera(v: Venta) -> VentaCabeceraOut:
 
 
 def _query_ventas(db: Session):
-    return (
-        db.query(Venta)
-        .options(joinedload(Venta.cliente), joinedload(Venta.empleado))
-    )
+    return db.query(Venta).options(joinedload(Venta.cliente), joinedload(Venta.empleado))
 
 
 @router.get("/", response_model=list[VentaCabeceraOut])
-def list_ventas(db: Session = Depends(get_session)):
+def list_ventas(
+    _: dict = Depends(require_rol("Admin", "Vendedor")),
+    db: Session = Depends(get_session),
+):
     ventas = _query_ventas(db).order_by(Venta.id_venta.desc()).all()
     return [_cabecera(v) for v in ventas]
 
 
 @router.get("/mis", response_model=list[VentaCabeceraOut])
 def list_mis_ventas(
-    x_nit_empleado: str = Header(..., alias="X-NIT-Empleado"),
+    user: dict = Depends(get_current_user),
     db: Session = Depends(get_session),
 ):
-    nit = x_nit_empleado.strip()
-    if not nit:
-        raise HTTPException(status_code=400, detail="X-NIT-Empleado vacío")
+    """Ventas del empleado autenticado — NIT extraído del JWT"""
+    nit = user["sub"]
     ventas = _query_ventas(db).filter(Venta.nit_empleado == nit).order_by(Venta.id_venta.desc()).all()
     return [_cabecera(v) for v in ventas]
 
@@ -59,7 +57,7 @@ def list_mis_ventas(
 @router.get("/empleado/{nit_empleado}/todas", response_model=list[VentaCabeceraOut])
 def list_ventas_por_empleado_admin(
     nit_empleado: str,
-    _: str = Depends(require_admin),
+    _: dict = Depends(require_rol("Admin")),
     db: Session = Depends(get_session),
 ):
     nit = nit_empleado.strip()
@@ -68,7 +66,11 @@ def list_ventas_por_empleado_admin(
 
 
 @router.get("/{id_venta}", response_model=VentaDetalleOut)
-def get_venta(id_venta: int, db: Session = Depends(get_session)):
+def get_venta(
+    id_venta: int,
+    _: dict = Depends(require_rol("Admin", "Vendedor")),
+    db: Session = Depends(get_session),
+):
     venta = (
         _query_ventas(db)
         .options(joinedload(Venta.lineas).joinedload(VentaProducto.producto))
@@ -77,7 +79,6 @@ def get_venta(id_venta: int, db: Session = Depends(get_session)):
     )
     if not venta:
         raise HTTPException(status_code=404, detail="Venta no encontrada")
-
     lineas = [
         VentaProductoLineOut(
             id_producto=lp.id_producto,
@@ -91,11 +92,14 @@ def get_venta(id_venta: int, db: Session = Depends(get_session)):
 
 
 @router.post("/", response_model=VentaDetalleOut, status_code=201)
-def create_venta(data: VentaCreate, db: Session = Depends(get_session)):
+def create_venta(
+    data: VentaCreate,
+    _: dict = Depends(require_rol("Admin", "Vendedor")),
+    db: Session = Depends(get_session),
+):
     if not data.productos:
         raise HTTPException(status_code=400, detail="La venta debe tener al menos un producto")
 
-    # Se crea un cliente nuevo
     id_cliente = None
     if data.nuevo_cliente is not None:
         nuevo = Cliente(nombre=data.nuevo_cliente.nombre, nit=data.nuevo_cliente.nit)
@@ -113,7 +117,7 @@ def create_venta(data: VentaCreate, db: Session = Depends(get_session)):
     ])
 
     try:
-        result = db.execute(#Uso del procedure para regitsrar la venta
+        result = db.execute(
             text("CALL sp_registrar_venta(:id_c, :nit, :prods::json, NULL, NULL)"),
             {"id_c": id_cliente, "nit": data.nit_empleado, "prods": productos_json},
         )
@@ -124,7 +128,6 @@ def create_venta(data: VentaCreate, db: Session = Depends(get_session)):
 
     db.commit()
 
-    #Cargar la venta
     venta = (
         db.query(Venta)
         .options(

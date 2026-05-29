@@ -5,8 +5,9 @@ from sqlalchemy import text
 from sqlalchemy.exc import DBAPIError
 from sqlalchemy.orm import Session, joinedload
 
+from auth_deps import require_rol
 from orm.database import get_session
-from orm.models import Compra, CompraProducto, Producto, Proveedor
+from orm.models import Compra, CompraProducto, Proveedor
 from schemas.compra import (
     CompraCabeceraListaOut,
     CompraCreate,
@@ -18,9 +19,14 @@ from schemas.producto import ProductoGet
 
 router = APIRouter(prefix="/compras", tags=["Compras"])
 
+_ROLES_COMPRAS = ("Admin", "Bodeguero")
+
 
 @router.get("/", response_model=list[CompraCabeceraListaOut])
-def list_compras(db: Session = Depends(get_session)):
+def list_compras(
+    _: dict = Depends(require_rol(*_ROLES_COMPRAS)),
+    db: Session = Depends(get_session),
+):
     compras = (
         db.query(Compra)
         .options(joinedload(Compra.proveedor))
@@ -40,7 +46,11 @@ def list_compras(db: Session = Depends(get_session)):
 
 
 @router.get("/productos-por-proveedor/{nit_proveedor}", response_model=list[ProductoGet])
-def productos_por_proveedor(nit_proveedor: str, db: Session = Depends(get_session)):
+def productos_por_proveedor(
+    nit_proveedor: str,
+    _: dict = Depends(require_rol(*_ROLES_COMPRAS)),
+    db: Session = Depends(get_session),
+):
     nit = nit_proveedor.strip()
     prov = db.query(Proveedor).filter(Proveedor.nit_proveedor == nit).first()
     if not prov:
@@ -53,29 +63,27 @@ def productos_por_proveedor(nit_proveedor: str, db: Session = Depends(get_sessio
         WHERE pr.activo = true
           AND (
             EXISTS (
-                SELECT 1 
-                FROM Compra_Producto cp
-                INNER JOIN Compra c 
-                    ON c.id_compra = cp.id_compra AND c.nit_proveedor = :nit
+                SELECT 1 FROM Compra_Producto cp
+                INNER JOIN Compra c ON c.id_compra = cp.id_compra AND c.nit_proveedor = :nit
                 WHERE cp.id_producto = pr.id_producto
             )
             OR EXISTS (
-                SELECT 1 
-                FROM Producto_Proveedor ppr
+                SELECT 1 FROM Producto_Proveedor ppr
                 WHERE ppr.id_producto = pr.id_producto AND ppr.nit_proveedor = :nit
             )
-            OR NOT EXISTS (
-                SELECT 1 FROM Compra c WHERE c.nit_proveedor = :nit
-            )
+            OR NOT EXISTS (SELECT 1 FROM Compra c WHERE c.nit_proveedor = :nit)
           )
         ORDER BY pr.id_producto
     """)
-    rows = db.execute(stmt, {"nit": nit}).mappings().all()
-    return [dict(r) for r in rows]
+    return [dict(r) for r in db.execute(stmt, {"nit": nit}).mappings().all()]
 
 
 @router.get("/{id_compra}/detalle", response_model=CompraDetalleOut)
-def get_compra_detalle(id_compra: int, db: Session = Depends(get_session)):
+def get_compra_detalle(
+    id_compra: int,
+    _: dict = Depends(require_rol(*_ROLES_COMPRAS)),
+    db: Session = Depends(get_session),
+):
     compra = (
         db.query(Compra)
         .options(
@@ -110,7 +118,11 @@ def get_compra_detalle(id_compra: int, db: Session = Depends(get_session)):
 
 
 @router.get("/{id_compra}", response_model=CompraGet)
-def get_compra(id_compra: int, db: Session = Depends(get_session)):
+def get_compra(
+    id_compra: int,
+    _: dict = Depends(require_rol(*_ROLES_COMPRAS)),
+    db: Session = Depends(get_session),
+):
     compra = db.query(Compra).filter(Compra.id_compra == id_compra).first()
     if not compra:
         raise HTTPException(status_code=404, detail="Compra no encontrada")
@@ -123,17 +135,17 @@ def get_compra(id_compra: int, db: Session = Depends(get_session)):
 
 
 @router.post("/", response_model=CompraGet, status_code=201)
-def create_compra(data: CompraCreate, db: Session = Depends(get_session)):
-    """Registra una compra completa invocando CALL sp_registrar_compra(...)"""
+def create_compra(
+    data: CompraCreate,
+    _: dict = Depends(require_rol(*_ROLES_COMPRAS)),
+    db: Session = Depends(get_session),
+):
+    #Uso de procedure para registrar una compra
     if not data.productos:
         raise HTTPException(status_code=400, detail="La compra debe tener al menos un producto")
 
     productos_json = json.dumps([
-        {
-            "id_producto": p.id_producto,
-            "cantidad": p.cantidad_compra,
-            "precio_compra": float(p.precio_compra),
-        }
+        {"id_producto": p.id_producto, "cantidad": p.cantidad_compra, "precio_compra": float(p.precio_compra)}
         for p in data.productos
     ])
 

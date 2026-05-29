@@ -1,4 +1,14 @@
-# Nombres de rol almacenados en Rol.nombre.
-# Los usuarios admin no se pueden eliminar ni desactivar desde la API.
-ADMIN_ROLE_NAME = "admin"
-VENDOR_ROLE_NAME = "vendedor"
+# Nombres de rol
+ADMIN_ROLE_NAME       = "Admin"
+VENDOR_ROLE_NAME      = "Vendedor"
+BODEGUERO_ROLE_NAME   = "Bodeguero"
+CONTADOR_ROLE_NAME    = "Contador"
+SUPERVISOR_ROLE_NAME  = "Supervisor"
+
+ALL_ROLES = [
+    ADMIN_ROLE_NAME,
+    VENDOR_ROLE_NAME,
+    BODEGUERO_ROLE_NAME,
+    CONTADOR_ROLE_NAME,
+    SUPERVISOR_ROLE_NAME,
+]

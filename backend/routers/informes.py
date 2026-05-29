@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
+from auth_deps import require_rol
 from database import get_db
 from orm.database import get_session
 from schemas.informes import (
@@ -20,10 +21,11 @@ from schemas.informes import (
 
 router = APIRouter(prefix="/informes", tags=["Informes"])
 
+_ROLES_INFORMES = ("Admin", "Contador", "Supervisor")
+
 
 @router.get("/catalogo-vista", response_model=list[ProductoCatalogoVistaOut])
-def catalogo_desde_vista():
-    """Usando view v_producto_con_categoria."""
+def catalogo_desde_vista(_: dict = Depends(require_rol(*_ROLES_INFORMES))):
     with get_db() as cur:
         cur.execute(
             """
@@ -37,11 +39,7 @@ def catalogo_desde_vista():
 
 
 @router.get("/ventas-por-categoria", response_model=list[VentaPorCategoriaOut])
-def ventas_por_categoria():
-    """
-    Sales by category (GROUP BY / HAVING).
-    Line amount uses Producto.precio_venta * cantidad_venta (Venta_Producto has no unit price column).
-    """
+def ventas_por_categoria(_: dict = Depends(require_rol(*_ROLES_INFORMES))):
     with get_db() as cur:
         cur.execute(
             """
@@ -70,16 +68,14 @@ def ventas_por_categoria():
 
 
 @router.get("/productos-nunca-vendidos", response_model=list[ProductoNuncaVendidoOut])
-def productos_nunca_vendidos():
-    """Products never sold (NOT IN / DISTINCT)."""
+def productos_nunca_vendidos(_: dict = Depends(require_rol(*_ROLES_INFORMES))):
     with get_db() as cur:
         cur.execute(
             """
             SELECT p.id_producto, p.nombre, p.cant_disponible
             FROM Producto p
             WHERE p.id_producto NOT IN (
-                SELECT DISTINCT vp.id_producto
-                FROM Venta_Producto vp
+                SELECT DISTINCT vp.id_producto FROM Venta_Producto vp
             )
             ORDER BY p.id_producto
             """
@@ -88,8 +84,7 @@ def productos_nunca_vendidos():
 
 
 @router.get("/ventas-por-mes", response_model=list[VentaPorMesSubqueryOut])
-def ventas_por_mes_subquery():
-    """Subquery in FROM: monthly aggregates, outer query filters."""
+def ventas_por_mes_subquery(_: dict = Depends(require_rol(*_ROLES_INFORMES))):
     with get_db() as cur:
         cur.execute(
             """
@@ -110,8 +105,7 @@ def ventas_por_mes_subquery():
 
 
 @router.get("/ultimas-lineas-venta", response_model=list[UltimaLineaVentaOut])
-def ultimas_lineas_venta():
-    """JOIN Venta, Venta_Producto, Producto, Cliente. Unit price from Producto (catalog price)."""
+def ultimas_lineas_venta(_: dict = Depends(require_rol(*_ROLES_INFORMES))):
     with get_db() as cur:
         cur.execute(
             """
@@ -134,8 +128,12 @@ def ultimas_lineas_venta():
 
 
 @router.get("/top-productos-vendidos", response_model=list[TopProductoVendidoOut])
-def top_productos_vendidos(limite: int = 25, db: Session = Depends(get_session)):
-    """Top productos más vendidos — invoca SELECT * FROM sp_top_productos(:limite)"""
+def top_productos_vendidos(
+    limite: int = 25,
+    _: dict = Depends(require_rol(*_ROLES_INFORMES)),
+    db: Session = Depends(get_session),
+):
+    #Uso de la function para ver el top de los productos
     rows = db.execute(
         text("SELECT * FROM top_productos(:limite)"),
         {"limite": limite},
@@ -155,9 +153,10 @@ def top_productos_vendidos(limite: int = 25, db: Session = Depends(get_session))
 def ventas_por_rango(
     fecha_inicio: datetime,
     fecha_fin: datetime,
+    _: dict = Depends(require_rol(*_ROLES_INFORMES)),
     db: Session = Depends(get_session),
 ):
-    """Reporte de ventas por rango de fecha — invoca SELECT * FROM sp_reporte_ventas(:inicio, :fin)"""
+    """Invoca SELECT * FROM reporte_ventas(:inicio, :fin)"""
     rows = db.execute(
         text("SELECT * FROM reporte_ventas(:inicio, :fin)"),
         {"inicio": fecha_inicio, "fin": fecha_fin},
@@ -166,8 +165,7 @@ def ventas_por_rango(
 
 
 @router.get("/compras-por-mes", response_model=list[CompraPorMesOut])
-def compras_por_mes():
-    """TCompras por mes """
+def compras_por_mes(_: dict = Depends(require_rol(*_ROLES_INFORMES))):
     with get_db() as cur:
         cur.execute(
             """
@@ -188,8 +186,7 @@ def compras_por_mes():
 
 
 @router.get("/ventas-por-empleado", response_model=list[VentaPorEmpleadoOut])
-def ventas_por_empleado():
-    """numero de ventas por empleado"""
+def ventas_por_empleado(_: dict = Depends(require_rol(*_ROLES_INFORMES))):
     with get_db() as cur:
         cur.execute(
             """
