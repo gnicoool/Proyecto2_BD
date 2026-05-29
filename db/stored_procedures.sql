@@ -95,10 +95,11 @@ CREATE TRIGGER trg_validar_proveedor_activo
 -- =========================
 
 /* sp_registrar_venta
-Registra una venta completa en una sola operacion transaccional
+Registra una venta completa usando transaccion,usando SAVEPOINT y ROLLBACK
 Recibe cliente, empleado y un arreglo JSON de productos porque la cantidad de lineas varia en cada venta
 Calcula el total con el precio_venta del catalogo, inserta Venta y Venta_Producto, y descuenta stock
-Devuelve el id de la venta y el total, este procedure lo usa rol_vendedor y rol_admin
+Antes de insert se crea el savepoint y si falla hace ROLLBACK TO SAVEPOINT
+Devuelve el id de la venta y el total, este procedure lo usa rol_vendedor y rol_admin.
 */
 CREATE OR REPLACE PROCEDURE sp_registrar_venta(
     IN  p_id_cliente    INT,
@@ -112,11 +113,12 @@ SECURITY DEFINER
 SET search_path = public
 AS $$
 DECLARE
-    v_item        JSON;
-    v_id_producto INT;
-    v_cantidad    INT;
-    v_precio      DECIMAL(10,2);
-    v_stock       INT;
+    v_item              JSON;
+    v_id_producto       INT;
+    v_cantidad          INT;
+    v_precio            DECIMAL(10,2);
+    v_stock             INT;
+    v_savepoint_activo  BOOLEAN := false;
 BEGIN
     IF p_productos IS NULL OR json_array_length(p_productos) = 0 THEN
         RAISE EXCEPTION 'La venta debe incluir al menos un producto';
@@ -124,6 +126,7 @@ BEGIN
 
     p_total := 0;
 
+    -- Validacion 
     FOR v_item IN SELECT value FROM json_array_elements(p_productos) AS t(value)
     LOOP
         v_id_producto := (v_item->>'id_producto')::INT;
@@ -154,6 +157,10 @@ BEGIN
         p_total := p_total + (v_precio * v_cantidad);
     END LOOP;
 
+    -- Si los inserts fallan regresan a este savepoint con un rollback
+    SAVEPOINT sp_venta_escritura;
+    v_savepoint_activo := true;
+
     INSERT INTO Venta (total, id_cliente, nit_empleado)
     VALUES (p_total, p_id_cliente, p_nit_empleado)
     RETURNING id_venta INTO p_id_venta;
@@ -173,15 +180,28 @@ BEGIN
         SET cant_disponible = cant_disponible - v_cantidad
         WHERE id_producto = v_id_producto;
     END LOOP;
+
+    RELEASE SAVEPOINT sp_venta_escritura;
+    v_savepoint_activo := false;
+
+EXCEPTION
+    WHEN OTHERS THEN
+        IF v_savepoint_activo THEN
+            ROLLBACK TO SAVEPOINT sp_venta_escritura;
+            v_savepoint_activo := false;
+            RAISE EXCEPTION 'Venta revertida. Error en escritura: %', SQLERRM;
+        END IF;
+        RAISE;
 END;
 $$;
 
 
 /* sp_registrar_compra
-Registra una compra completa al proveedor en una sola operacion transaccional
-Recibe el NIT del proveedor y un arreglo JSON de productos con cantidad y precio_compra, es parecido al registro de ventas
+Para registrar una compra completa al proveedor, usando SAVEPOINT y ROLLBACK por si fallan los inserts
+Recibe el NIT del proveedor y un arreglo JSON de productos con cantidad y precio_compra
 Inserta Compra y Compra_Producto, aumenta stock y actualiza precio_compra del producto
-Devuelve el id de la compra y el total,este procedure lo usa rol_bodeguero y rol_admin
+Antes de insert se crea el SAVEPOINT y si falla se hace ROLLBACK TO SAVEPOINT
+Devuelve el id de la compra y el total, este procedure lo usa rol_bodeguero y rol_admin.
 */
 CREATE OR REPLACE PROCEDURE sp_registrar_compra(
     IN  p_nit_proveedor VARCHAR(8),
@@ -194,10 +214,11 @@ SECURITY DEFINER
 SET search_path = public
 AS $$
 DECLARE
-    v_item          JSON;
-    v_id_producto   INT;
-    v_cantidad      INT;
-    v_precio_compra DECIMAL(10,2);
+    v_item              JSON;
+    v_id_producto       INT;
+    v_cantidad          INT;
+    v_precio_compra     DECIMAL(10,2);
+    v_savepoint_activo  BOOLEAN := false;
 BEGIN
     IF p_productos IS NULL OR json_array_length(p_productos) = 0 THEN
         RAISE EXCEPTION 'La compra debe incluir al menos un producto';
@@ -236,6 +257,10 @@ BEGIN
         p_total := p_total + (v_cantidad * v_precio_compra);
     END LOOP;
 
+    -- Este es el savepoint a donde regresa si algo falla y se hace ROLLBACK
+    SAVEPOINT sp_compra_escritura;
+    v_savepoint_activo := true;
+
     INSERT INTO Compra (total, nit_proveedor)
     VALUES (p_total, p_nit_proveedor)
     RETURNING id_compra INTO p_id_compra;
@@ -258,6 +283,18 @@ BEGIN
             precio_compra   = v_precio_compra
         WHERE id_producto = v_id_producto;
     END LOOP;
+
+    RELEASE SAVEPOINT sp_compra_escritura;
+    v_savepoint_activo := false;
+
+EXCEPTION
+    WHEN OTHERS THEN
+        IF v_savepoint_activo THEN
+            ROLLBACK TO SAVEPOINT sp_compra_escritura;
+            v_savepoint_activo := false;
+            RAISE EXCEPTION 'Compra revertida. Error en escritura: %', SQLERRM;
+        END IF;
+        RAISE;
 END;
 $$;
 
@@ -480,8 +517,8 @@ GRANT EXECUTE ON PROCEDURE sp_gestionar_empleado(
     VARCHAR, VARCHAR, VARCHAR, VARCHAR, VARCHAR, VARCHAR, INT
 ) TO rol_admin;
 
-GRANT EXECUTE ON FUNCTION sp_reporte_ventas(TIMESTAMP, TIMESTAMP) TO rol_contador, rol_supervisor, rol_admin;
-GRANT EXECUTE ON FUNCTION sp_top_productos(INT) TO rol_contador, rol_supervisor, rol_admin;
+GRANT EXECUTE ON FUNCTION reporte_ventas(TIMESTAMP, TIMESTAMP) TO rol_contador, rol_supervisor, rol_admin;
+GRANT EXECUTE ON FUNCTION top_productos(INT) TO rol_contador, rol_supervisor, rol_admin;
 
 REVOKE ALL ON FUNCTION fn_trg_validar_stock() FROM PUBLIC;
 REVOKE ALL ON FUNCTION fn_trg_validar_empleado_activo() FROM PUBLIC;
