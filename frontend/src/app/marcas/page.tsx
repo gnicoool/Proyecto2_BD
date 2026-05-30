@@ -1,13 +1,14 @@
-"use client";
-
 import { useCallback, useEffect, useState } from "react";
 import { FloatingButton } from "../../components/Layout/botonflotante";
 import { NuevaMarcaModal } from "../../components/modal/NuevaMarca/NuevaMarcaModal";
 import { apiClient } from "../../lib/apiClient";
+import { useAuth } from "../../hooks/useAuth";
 
 type Marca = { id: number; nombre: string };
 
 export default function MarcasPage() {
+  const { hasRol } = useAuth();
+  const puedeCrear = hasRol("Admin");
   const [marcas, setMarcas] = useState<Marca[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -58,13 +59,17 @@ export default function MarcasPage() {
         )}
       </div>
 
-      <FloatingButton ariaLabel="Nueva marca" onClick={() => setNuevaOpen(true)} />
+      {puedeCrear ? (
+        <>
+          <FloatingButton ariaLabel="Nueva marca" onClick={() => setNuevaOpen(true)} />
 
-      <NuevaMarcaModal
-        open={nuevaOpen}
-        onClose={() => setNuevaOpen(false)}
-        onSuccess={() => void loadMarcas()}
-      />
+          <NuevaMarcaModal
+            open={nuevaOpen}
+            onClose={() => setNuevaOpen(false)}
+            onSuccess={() => void loadMarcas()}
+          />
+        </>
+      ) : null}
     </>
   );
 }

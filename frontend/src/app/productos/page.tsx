@@ -4,6 +4,7 @@ import { ProductoCard } from "../../components/producto/ProductoCard";
 import { ProductoDetalle, type Producto } from "../../components/producto/ProductoDetalle";
 import { FloatingButton } from "../../components/Layout/botonflotante";
 import { NuevoProductoModal } from "../../components/modal/NuevoProducto/NuevoProductoModal";
+import type { ProductoEditInput } from "../../components/modal/NuevoProducto/FormNuevoProducto";
 import { apiClient } from "../../lib/apiClient";
 import { useAuth } from "../../hooks/useAuth";
 
@@ -42,7 +43,22 @@ function mapProductos(rows: ProductoApi[], marcasById: Map<number, string>): Pro
     precio_venta: toNum(p.precio_venta),
     cantidad_disponible: p.cant_disponible,
     activo: p.activo,
+    id_categoria: p.id_categoria,
+    id_marca: p.id_marca,
   }));
+}
+
+function toEditInput(p: Producto): ProductoEditInput {
+  return {
+    id_producto: p.id,
+    nombre: p.nombre,
+    descripcion: p.descripcion ?? null,
+    precio_venta: p.precio_venta,
+    precio_compra: p.precio_compra,
+    cant_disponible: p.cantidad_disponible,
+    id_categoria: p.id_categoria ?? 0,
+    id_marca: p.id_marca ?? 0,
+  };
 }
 
 function parseCategoriaFilter(searchParams: URLSearchParams): {
@@ -62,14 +78,24 @@ function parseCategoriaFilter(searchParams: URLSearchParams): {
   return { id, nombreLabel };
 }
 
-function ProductoGrid({ productos }: { productos: Producto[] }) {
+type GridProps = {
+  productos: Producto[];
+  onEditar?: (p: Producto) => void;
+};
+
+function ProductoGrid({ productos, onEditar }: GridProps) {
   const [selected, setSelected] = useState<Producto | null>(null);
 
   return (
     <>
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
         {productos.map((p) => (
-          <ProductoCard key={p.id} producto={p} onVerDetalle={setSelected} />
+          <ProductoCard
+            key={p.id}
+            producto={p}
+            onVerDetalle={setSelected}
+            onEditar={onEditar}
+          />
         ))}
       </div>
 
@@ -80,7 +106,7 @@ function ProductoGrid({ productos }: { productos: Producto[] }) {
 
 export default function ProductosPage() {
   const { hasRol } = useAuth();
-  const puedeCrear = hasRol("Admin", "Supervisor");
+  const puedeGestionar = hasRol("Admin", "Supervisor");
   const [searchParams] = useSearchParams();
   const filtroCategoria = useMemo(() => parseCategoriaFilter(searchParams), [searchParams]);
 
@@ -88,6 +114,7 @@ export default function ProductosPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [nuevoOpen, setNuevoOpen] = useState(false);
+  const [editProduct, setEditProduct] = useState<ProductoEditInput | null>(null);
 
   const loadProductos = useCallback(async () => {
     setError(null);
@@ -117,6 +144,13 @@ export default function ProductosPage() {
   useEffect(() => {
     void loadProductos();
   }, [loadProductos]);
+
+  const closeModal = () => {
+    setNuevoOpen(false);
+    setEditProduct(null);
+  };
+
+  const modalOpen = nuevoOpen || editProduct !== null;
 
   if (loading) {
     return (
@@ -153,19 +187,26 @@ export default function ProductosPage() {
               : "No hay productos registrados."}
           </p>
         ) : (
-          <ProductoGrid productos={productos} />
+          <ProductoGrid
+            productos={productos}
+            onEditar={puedeGestionar ? (p) => { setNuevoOpen(false); setEditProduct(toEditInput(p)); } : undefined}
+          />
         )}
       </div>
 
-      {puedeCrear && (
-        <FloatingButton ariaLabel="Nuevo producto" onClick={() => setNuevoOpen(true)} />
+      {puedeGestionar && (
+        <FloatingButton
+          ariaLabel="Nuevo producto"
+          onClick={() => { setEditProduct(null); setNuevoOpen(true); }}
+        />
       )}
 
-      {puedeCrear && (
+      {puedeGestionar && (
         <NuevoProductoModal
-          open={nuevoOpen}
-          onClose={() => setNuevoOpen(false)}
+          open={modalOpen}
+          onClose={closeModal}
           onSuccess={() => void loadProductos()}
+          editProduct={editProduct}
         />
       )}
     </>

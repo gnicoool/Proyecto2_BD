@@ -27,8 +27,12 @@ export default function App() {
         <Route element={<RequireAuth />}>
           <Route path="/" element={<Layout />}>
             <Route index element={<RootIndexRedirect />} />
-            <Route path="mis-ventas" element={<MisVentasPage />} />
             <Route path="no-autorizado" element={<NoAutorizadoPage />} />
+
+            {/* Mis ventas — solo Vendedor (INSERT Venta según roles.sql) */}
+            <Route element={<RequireRol roles={["Vendedor"]} />}>
+              <Route path="mis-ventas" element={<MisVentasPage />} />
+            </Route>
 
             {/* Tienda — Vendedor (catálogo con carrito) */}
             <Route element={<RequireRol roles={["Vendedor"]} />}>
@@ -37,8 +41,8 @@ export default function App() {
               <Route path="tienda/productos" element={<TiendaProductosPage />} />
             </Route>
 
-            {/* Ventas — Admin, Vendedor (crear), Contador y Supervisor (solo ver) */}
-            <Route element={<RequireRol roles={["Admin", "Vendedor", "Contador", "Supervisor"]} />}>
+            {/* Ventas — Admin, Contador y Supervisor (solo ver listado global) */}
+            <Route element={<RequireRol roles={["Admin", "Contador", "Supervisor"]} />}>
               <Route path="ventas" element={<VentasPage />} />
             </Route>
 
@@ -47,8 +51,8 @@ export default function App() {
               <Route path="compras" element={<ComprasPage />} />
             </Route>
 
-            {/* Productos — Admin y Supervisor (crear/editar), Bodeguero (solo ver) */}
-            <Route element={<RequireRol roles={["Admin", "Bodeguero", "Supervisor"]} />}>
+            {/* Productos — Admin/Supervisor gestionan; Bodeguero/Contador solo SELECT */}
+            <Route element={<RequireRol roles={["Admin", "Bodeguero", "Supervisor", "Contador"]} />}>
               <Route path="productos" element={<ProductosPage />} />
             </Route>
 
@@ -68,13 +72,13 @@ export default function App() {
               <Route path="proveedores" element={<ProveedoresPage />} />
             </Route>
 
-            {/* Categorías — Admin (gestión) y Bodeguero (solo ver) */}
-            <Route element={<RequireRol roles={["Admin", "Bodeguero"]} />}>
+            {/* Categorías — Admin gestiona; Bodeguero/Supervisor/Contador solo SELECT */}
+            <Route element={<RequireRol roles={["Admin", "Bodeguero", "Supervisor", "Contador"]} />}>
               <Route path="categorias" element={<CategoriasPage />} />
             </Route>
 
-            {/* Marcas — Admin (gestión) y Bodeguero (solo ver) */}
-            <Route element={<RequireRol roles={["Admin", "Bodeguero"]} />}>
+            {/* Marcas — Admin gestiona; Bodeguero/Supervisor/Contador solo SELECT */}
+            <Route element={<RequireRol roles={["Admin", "Bodeguero", "Supervisor", "Contador"]} />}>
               <Route path="marcas" element={<MarcasPage />} />
             </Route>
           </Route>

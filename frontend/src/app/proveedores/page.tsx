@@ -22,6 +22,7 @@ export default function ProveedoresPage() {
   const navigate = useNavigate();
   const { user, hasRol } = useAuth();
   const puedeGestionar = hasRol("Admin", "Supervisor");
+  const puedeEliminar = hasRol("Admin");
   const [items, setItems] = useState<ProveedorListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -123,7 +124,7 @@ export default function ProveedoresPage() {
               tipo="proveedor"
               onView={verComprasProveedor}
               onEdit={puedeGestionar ? openEdit : undefined}
-              onDelete={puedeGestionar ? handleDelete : undefined}
+              onDelete={puedeEliminar ? handleDelete : undefined}
             />
           </div>
         </div>

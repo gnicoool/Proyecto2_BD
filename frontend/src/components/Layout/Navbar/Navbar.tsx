@@ -16,8 +16,8 @@ function tabClass(isActive: boolean): string {
 
 // Definición de todas las pestañas y qué roles pueden verlas
 const ALL_TABS = [
-  // Admin y Vendedor
-  { label: "Ventas",      to: ROUTES.ventas,      roles: ["Admin", "Vendedor", "Contador", "Supervisor"] },
+  // Admin, Contador y Supervisor (Vendedor usa Mis Ventas + carrito)
+  { label: "Ventas",      to: ROUTES.ventas,      roles: ["Admin", "Contador", "Supervisor"] },
   { label: "Mis Ventas",  to: ROUTES.misVentas,   roles: ["Vendedor"] },
   // Vendedor — tienda con carrito
   { label: "Categorías",  to: ROUTES.tiendaCategorias, roles: ["Vendedor"] },
@@ -25,13 +25,13 @@ const ALL_TABS = [
   { label: "Productos",   to: ROUTES.tiendaProductos,  roles: ["Vendedor"] },
   // Bodeguero
   { label: "Compras",     to: ROUTES.compras,     roles: ["Admin", "Bodeguero", "Contador", "Supervisor"] },
-  // Bodeguero: solo ver y Supervisor: crear/editar)
-  { label: "Productos",   to: ROUTES.productos,   roles: ["Admin", "Bodeguero", "Supervisor"] },
-  // Supervisor
+  // Bodeguero/Supervisor/Contador: ver; Admin/Supervisor: gestionar
+  { label: "Productos",   to: ROUTES.productos,   roles: ["Admin", "Bodeguero", "Supervisor", "Contador"] },
+  // Supervisor gestiona; Contador solo consulta
   { label: "Proveedores", to: ROUTES.proveedores, roles: ["Admin", "Supervisor", "Contador"] },
-  // Bodeguero ver categorías y marcas (solo lectura)
-  { label: "Categorías",  to: ROUTES.categorias,  roles: ["Admin", "Bodeguero"] },
-  { label: "Marcas",      to: ROUTES.marcas,      roles: ["Admin", "Bodeguero"] },
+  // Admin gestiona; demás roles con SELECT en roles.sql solo consultan
+  { label: "Categorías",  to: ROUTES.categorias,  roles: ["Admin", "Bodeguero", "Supervisor", "Contador"] },
+  { label: "Marcas",      to: ROUTES.marcas,      roles: ["Admin", "Bodeguero", "Supervisor", "Contador"] },
   // Supervisor ver empleados
   { label: "Empleados",   to: ROUTES.empleados,   roles: ["Admin", "Supervisor"] },
   // Contador y Supervisor

@@ -3,9 +3,12 @@ import { CategoryCard } from "../../components/categoria/CategoryCard";
 import { FloatingButton } from "../../components/Layout/botonflotante";
 import { NuevaCategoriaModal } from "../../components/modal/NuevaCategoria/NuevaCategoriaModal";
 import { apiClient } from "../../lib/apiClient";
+import { useAuth } from "../../hooks/useAuth";
 import type { Categoria } from "../../types/categoria";
 
 export default function CategoriasPage() {
+  const { hasRol } = useAuth();
+  const puedeCrear = hasRol("Admin");
   const [items, setItems] = useState<Categoria[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -63,13 +66,17 @@ export default function CategoriasPage() {
         )}
       </div>
 
-      <FloatingButton ariaLabel="Nueva categoría" onClick={() => setNuevaOpen(true)} />
+      {puedeCrear ? (
+        <>
+          <FloatingButton ariaLabel="Nueva categoría" onClick={() => setNuevaOpen(true)} />
 
-      <NuevaCategoriaModal
-        open={nuevaOpen}
-        onClose={() => setNuevaOpen(false)}
-        onSuccess={() => void loadCategorias()}
-      />
+          <NuevaCategoriaModal
+            open={nuevaOpen}
+            onClose={() => setNuevaOpen(false)}
+            onSuccess={() => void loadCategorias()}
+          />
+        </>
+      ) : null}
     </>
   );
 }
