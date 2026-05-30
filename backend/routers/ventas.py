@@ -36,7 +36,7 @@ def _query_ventas(db: Session):
 
 @router.get("/", response_model=list[VentaCabeceraOut])
 def list_ventas(
-    _: dict = Depends(require_rol("Admin", "Vendedor", "Contador")),
+    _: dict = Depends(require_rol("Admin", "Contador", "Supervisor")),
     db: Session = Depends(get_session),
 ):
     ventas = _query_ventas(db).order_by(Venta.id_venta.desc()).all()
@@ -68,7 +68,7 @@ def list_ventas_por_empleado_admin(
 @router.get("/{id_venta}", response_model=VentaDetalleOut)
 def get_venta(
     id_venta: int,
-    _: dict = Depends(require_rol("Admin", "Vendedor", "Contador")),
+    _: dict = Depends(require_rol("Admin", "Vendedor", "Contador", "Supervisor")),
     db: Session = Depends(get_session),
 ):
     venta = (

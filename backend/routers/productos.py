@@ -10,7 +10,7 @@ from schemas.producto import ProductoCreate, ProductoDelete, ProductoGet, Produc
 
 router = APIRouter(prefix="/productos", tags=["Productos"])
 
-_ROLES_GESTION = ("Admin", "Bodeguero", "Supervisor")
+_ROLES_GESTION = ("Admin", "Supervisor")
 
 
 def _to_get(p: Producto) -> ProductoGet:

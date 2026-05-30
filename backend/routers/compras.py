@@ -20,7 +20,7 @@ from schemas.producto import ProductoGet
 router = APIRouter(prefix="/compras", tags=["Compras"])
 
 _ROLES_COMPRAS = ("Admin", "Bodeguero")
-_ROLES_COMPRAS_LECTURA = ("Admin", "Bodeguero", "Contador")
+_ROLES_COMPRAS_LECTURA = ("Admin", "Bodeguero", "Contador", "Supervisor")
 
 
 @router.get("/", response_model=list[CompraCabeceraListaOut])

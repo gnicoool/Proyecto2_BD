@@ -1,14 +1,17 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import func, text
+from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from auth_deps import require_admin_nit, require_rol
+from auth_deps import get_role_session, require_rol
 from orm.database import get_session
 from orm.models import Compra, Proveedor as ProveedorModel
 from schemas.proveedor import ProveedorCreate, ProveedorDelete, ProveedorGet, ProveedorUpdate
 
 router = APIRouter(prefix="/proveedores", tags=["Proveedores"])
+
+_ROLES_LECTURA   = ("Admin", "Contador", "Supervisor")
+_ROLES_ESCRITURA = ("Admin", "Supervisor")
 
 
 def _total_compras(db: Session, nit: str) -> int:
@@ -28,9 +31,9 @@ def _to_get(p: ProveedorModel, total: int) -> ProveedorGet:
 
 @router.get("/", response_model=list[ProveedorGet])
 def get_proveedores(
-    _: dict = Depends(require_rol("Admin", "Bodeguero", "Supervisor")),
+    user: dict = Depends(require_rol(*_ROLES_LECTURA)),
     include_inactive: bool = Query(False),
-    db: Session = Depends(get_session),
+    db: Session = Depends(get_role_session),
 ):
     q = db.query(
         ProveedorModel,
@@ -40,7 +43,7 @@ def get_proveedores(
      .order_by(ProveedorModel.nit_proveedor)
 
     if not include_inactive:
-        q = q.filter(ProveedorModel.activo == True)
+        q = q.filter(ProveedorModel.activo == True)  # noqa: E712
 
     return [_to_get(p, total) for p, total in q.all()]
 
@@ -48,8 +51,8 @@ def get_proveedores(
 @router.post("/", response_model=ProveedorGet, status_code=201)
 def create_proveedor(
     data: ProveedorCreate,
-    _: str = Depends(require_admin_nit),
-    db: Session = Depends(get_session),
+    user: dict = Depends(require_rol(*_ROLES_ESCRITURA)),
+    db: Session = Depends(get_role_session),
 ):
     proveedor = ProveedorModel(
         nit_proveedor=data.nit_proveedor.strip(),
@@ -71,8 +74,8 @@ def create_proveedor(
 def update_proveedor(
     nit_proveedor: str,
     data: ProveedorUpdate,
-    _: str = Depends(require_admin_nit),
-    db: Session = Depends(get_session),
+    user: dict = Depends(require_rol(*_ROLES_ESCRITURA)),
+    db: Session = Depends(get_role_session),
 ):
     nit = nit_proveedor.strip()
     payload = data.model_dump(exclude_unset=True)
@@ -94,8 +97,8 @@ def update_proveedor(
 @router.delete("/{nit_proveedor}", response_model=ProveedorDelete)
 def delete_proveedor(
     nit_proveedor: str,
-    _: str = Depends(require_admin_nit),
-    db: Session = Depends(get_session),
+    _: dict = Depends(require_rol("Admin")),
+    db: Session = Depends(get_role_session),
 ):
     nit = nit_proveedor.strip()
     proveedor = db.query(ProveedorModel).filter(ProveedorModel.nit_proveedor == nit).first()
