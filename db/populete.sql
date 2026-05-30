@@ -402,3 +402,31 @@ SELECT setval(
     pg_get_serial_sequence('venta', 'id_venta'),
     COALESCE((SELECT MAX(id_venta) FROM venta), 1)
 );
+
+/* Usuarios PostgreSQL de los empleados seed
+Cada empleado tiene su propio usuario DB con LOGIN que hereda del grupo rol que se le asigno, usa la misma
+contraseña del frontend para autenticar en DB 
+*/
+DO $$
+BEGIN
+    -- Admin seed
+    IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = '90000001') THEN
+        CREATE USER "90000001" WITH LOGIN INHERIT IN ROLE rol_admin PASSWORD 'admin123';
+    END IF;
+    -- Vendedor seed
+    IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = '90000002') THEN
+        CREATE USER "90000002" WITH LOGIN INHERIT IN ROLE rol_vendedor PASSWORD 'vendedor123';
+    END IF;
+    -- Bodeguero seed
+    IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = '90000003') THEN
+        CREATE USER "90000003" WITH LOGIN INHERIT IN ROLE rol_bodeguero PASSWORD 'bodeguero123';
+    END IF;
+    -- Contador seed
+    IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = '90000004') THEN
+        CREATE USER "90000004" WITH LOGIN INHERIT IN ROLE rol_contador PASSWORD 'contador123';
+    END IF;
+    -- Supervisor seed
+    IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = '90000005') THEN
+        CREATE USER "90000005" WITH LOGIN INHERIT IN ROLE rol_supervisor PASSWORD 'supervisor123';
+    END IF;
+END $$;
