@@ -6,6 +6,17 @@ import type { ProveedorListItem } from "../../../types/proveedor";
 type CategoriaOpt = { id_categoria: number; nombre: string };
 type MarcaOpt = { id_marca: number; nombre: string };
 
+export type ProductoEditInput = {
+  id_producto: number;
+  nombre: string;
+  descripcion?: string | null;
+  precio_venta: number | string;
+  precio_compra: number | string;
+  cant_disponible: number;
+  id_categoria: number;
+  id_marca: number;
+};
+
 type FormState = {
   nombre: string;
   descripcion: string;
@@ -28,14 +39,29 @@ const EMPTY: FormState = {
   nit_proveedor: "",
 };
 
+function toFormState(producto: ProductoEditInput): FormState {
+  return {
+    nombre: producto.nombre,
+    descripcion: producto.descripcion ?? "",
+    precio_venta: String(producto.precio_venta),
+    precio_compra: String(producto.precio_compra),
+    cant_disponible: String(producto.cant_disponible),
+    id_categoria: String(producto.id_categoria),
+    id_marca: String(producto.id_marca),
+    nit_proveedor: "",
+  };
+}
+
 type Props = {
   open: boolean;
   onClose: () => void;
   onSuccess?: () => void;
   requestHeaders?: HeadersInit;
+  editProduct?: ProductoEditInput | null;
 };
 
-export function FormNuevoProducto({ open, onClose, onSuccess, requestHeaders }: Props) {
+export function FormNuevoProducto({ open, onClose, onSuccess, editProduct }: Props) {
+  const isEdit = editProduct != null;
   const [form, setForm] = useState<FormState>(EMPTY);
   const [categorias, setCategorias] = useState<CategoriaOpt[]>([]);
   const [marcas, setMarcas] = useState<MarcaOpt[]>([]);
@@ -45,10 +71,10 @@ export function FormNuevoProducto({ open, onClose, onSuccess, requestHeaders }: 
 
   useEffect(() => {
     if (open) {
-      setForm(EMPTY);
+      setForm(isEdit && editProduct ? toFormState(editProduct) : EMPTY);
       setErr(null);
     }
-  }, [open]);
+  }, [open, isEdit, editProduct]);
 
   useEffect(() => {
     let cancelled = false;
@@ -62,12 +88,14 @@ export function FormNuevoProducto({ open, onClose, onSuccess, requestHeaders }: 
         setCategorias(cats);
         setMarcas(mrcs);
 
-        if (requestHeaders) {
-          const provs = await apiClient.get<ProveedorListItem[]>("/proveedores/", {
-            headers: requestHeaders,
-          });
-          if (!cancelled) {
-            setProveedores(provs.filter((p) => p.activo));
+        if (!isEdit) {
+          try {
+            const provs = await apiClient.get<ProveedorListItem[]>("/proveedores/");
+            if (!cancelled) {
+              setProveedores(provs.filter((p) => p.activo));
+            }
+          } catch {
+            if (!cancelled) setProveedores([]);
           }
         } else if (!cancelled) {
           setProveedores([]);
@@ -81,7 +109,7 @@ export function FormNuevoProducto({ open, onClose, onSuccess, requestHeaders }: 
     return () => {
       cancelled = true;
     };
-  }, [requestHeaders]);
+  }, [isEdit]);
 
   const set = (k: keyof FormState) => (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
@@ -109,27 +137,45 @@ export function FormNuevoProducto({ open, onClose, onSuccess, requestHeaders }: 
       setErr("Seleccione una marca.");
       return;
     }
-    if (!form.nit_proveedor.trim()) {
+    if (!isEdit && !form.nit_proveedor.trim()) {
       setErr("Seleccione el proveedor con el que podrá comprar este producto.");
       return;
     }
 
     setLoading(true);
     try {
-      await apiClient.post("/productos/", {
-        nombre: form.nombre.trim(),
-        descripcion: form.descripcion.trim() || undefined,
-        precio_venta: Number(form.precio_venta),
-        precio_compra: Number(form.precio_compra),
-        cant_disponible: form.cant_disponible ? Number(form.cant_disponible) : 0,
-        id_categoria: Number(form.id_categoria),
-        id_marca: Number(form.id_marca),
-        nit_proveedor: form.nit_proveedor.trim(),
-      });
+      if (isEdit && editProduct) {
+        await apiClient.patch(`/productos/${editProduct.id_producto}`, {
+          nombre: form.nombre.trim(),
+          descripcion: form.descripcion.trim() || null,
+          precio_venta: Number(form.precio_venta),
+          precio_compra: Number(form.precio_compra),
+          cant_disponible: form.cant_disponible ? Number(form.cant_disponible) : 0,
+          id_categoria: Number(form.id_categoria),
+          id_marca: Number(form.id_marca),
+        });
+      } else {
+        await apiClient.post("/productos/", {
+          nombre: form.nombre.trim(),
+          descripcion: form.descripcion.trim() || undefined,
+          precio_venta: Number(form.precio_venta),
+          precio_compra: Number(form.precio_compra),
+          cant_disponible: form.cant_disponible ? Number(form.cant_disponible) : 0,
+          id_categoria: Number(form.id_categoria),
+          id_marca: Number(form.id_marca),
+          nit_proveedor: form.nit_proveedor.trim(),
+        });
+      }
       onSuccess?.();
       onClose();
     } catch (e) {
-      setErr(e instanceof Error ? e.message : "Error al crear el producto.");
+      setErr(
+        e instanceof Error
+          ? e.message
+          : isEdit
+            ? "Error al actualizar el producto."
+            : "Error al crear el producto.",
+      );
     } finally {
       setLoading(false);
     }
@@ -138,7 +184,6 @@ export function FormNuevoProducto({ open, onClose, onSuccess, requestHeaders }: 
   return (
     <>
       <div className="overflow-y-auto px-5 py-5 space-y-4">
-
         <Field label="Nombre" id="prod-nombre">
           <input
             id="prod-nombre"
@@ -236,24 +281,27 @@ export function FormNuevoProducto({ open, onClose, onSuccess, requestHeaders }: 
           </Field>
         </div>
 
-        <Field label="Proveedor" id="prod-prov">
-          <select
-            id="prod-prov"
-            value={form.nit_proveedor}
-            onChange={set("nit_proveedor")}
-            className={INPUT_CLASS}
-          >
-            <option value="">— Seleccionar —</option>
-            {proveedores.map((p) => (
-              <option key={p.nit_proveedor} value={p.nit_proveedor}>
-                {p.nombre} ({p.nit_proveedor})
-              </option>
-            ))}
-          </select>
-          <p className="mt-1 text-[11px] text-sky-500">
-            Se guarda la relación para que el producto aparezca al registrar compras con ese proveedor.
-          </p>
-        </Field>
+        {!isEdit ? (
+          <Field label="Proveedor" id="prod-prov">
+            <select
+              id="prod-prov"
+              value={form.nit_proveedor}
+              onChange={set("nit_proveedor")}
+              className={INPUT_CLASS}
+            >
+              <option value="">— Seleccionar —</option>
+              {proveedores.map((p) => (
+                <option key={p.nit_proveedor} value={p.nit_proveedor}>
+                  {p.nombre} ({p.nit_proveedor})
+                </option>
+              ))}
+            </select>
+            <p className="mt-1 text-[11px] text-sky-500">
+              Se guarda la relación para que el producto aparezca al registrar compras con ese
+              proveedor.
+            </p>
+          </Field>
+        ) : null}
 
         {err && (
           <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">
@@ -262,7 +310,6 @@ export function FormNuevoProducto({ open, onClose, onSuccess, requestHeaders }: 
         )}
       </div>
 
-      {/* Footer */}
       <div className="flex items-center justify-end gap-3 border-t border-sky-100 bg-sky-50 px-5 py-4">
         <button
           type="button"
@@ -277,7 +324,7 @@ export function FormNuevoProducto({ open, onClose, onSuccess, requestHeaders }: 
           disabled={loading}
           className="rounded-lg bg-sky-500 px-5 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-sky-600 disabled:cursor-not-allowed disabled:opacity-50"
         >
-          {loading ? "Creando…" : "Crear"}
+          {loading ? (isEdit ? "Guardando…" : "Creando…") : isEdit ? "Guardar cambios" : "Crear"}
         </button>
       </div>
     </>

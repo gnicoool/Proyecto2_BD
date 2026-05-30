@@ -12,6 +12,8 @@ export type Producto = {
   precio_venta: number;
   cantidad_disponible: number;
   activo?: boolean;
+  id_categoria?: number;
+  id_marca?: number;
 };
 
 const fmt = (n: number) =>
