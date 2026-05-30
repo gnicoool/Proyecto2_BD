@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import { NavLink, Link, useNavigate } from "react-router-dom";
-import { UserCircle2, LogOut } from "lucide-react";
+import { UserCircle2, LogOut, ShoppingCart } from "lucide-react";
 import { ROUTES } from "../../../lib/authRoutes";
 import { useAuth } from "../../../hooks/useAuth";
+import { useNuevaVentaDraftOptional } from "../../../context/useNuevaVentaDraft";
 
 const tabBase =
   "rounded-t-lg border border-transparent border-b-0 px-[1.125rem] pb-3 pt-2.5 text-[0.9375rem] font-bold text-neutral-950 transition-colors duration-150";
@@ -18,6 +19,10 @@ const ALL_TABS = [
   // Admin y Vendedor
   { label: "Ventas",      to: ROUTES.ventas,      roles: ["Admin", "Vendedor", "Contador", "Supervisor"] },
   { label: "Mis Ventas",  to: ROUTES.misVentas,   roles: ["Vendedor"] },
+  // Vendedor — tienda con carrito
+  { label: "Categorías",  to: ROUTES.tiendaCategorias, roles: ["Vendedor"] },
+  { label: "Marcas",      to: ROUTES.tiendaMarcas,     roles: ["Vendedor"] },
+  { label: "Productos",   to: ROUTES.tiendaProductos,  roles: ["Vendedor"] },
   // Bodeguero
   { label: "Compras",     to: ROUTES.compras,     roles: ["Admin", "Bodeguero", "Contador", "Supervisor"] },
   // Bodeguero: solo ver y Supervisor: crear/editar)
@@ -34,10 +39,12 @@ const ALL_TABS = [
 ] as const;
 
 export function Navbar() {
-  const { user, rol, logout } = useAuth();
+  const { user, rol, isVendedor, logout } = useAuth();
   const navigate = useNavigate();
   const [menuOpen, setMenuOpen] = useState(false);
   const wrapRef = useRef<HTMLDivElement>(null);
+  const draft = useNuevaVentaDraftOptional();
+  const cartUnits = isVendedor ? draft?.totalUnidades ?? 0 : 0;
 
   const handleLogout = () => {
     logout();
@@ -85,6 +92,21 @@ export function Navbar() {
                 {tab.label}
               </NavLink>
             ))}
+            {isVendedor ? (
+              <Link
+                to={ROUTES.misVentas}
+                state={{ finalizeSale: true }}
+                className="relative mb-0.5 inline-flex items-center gap-1.5 rounded-t-lg border border-transparent border-b-0 px-3 pb-3 pt-2.5 text-[0.9375rem] font-bold text-neutral-950 hover:bg-white/20"
+                aria-label="Finalizar venta con el carrito"
+              >
+                <ShoppingCart className="h-5 w-5" aria-hidden />
+                {cartUnits > 0 ? (
+                  <span className="absolute right-0.5 top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-emerald-600 px-1 text-[10px] font-bold text-white">
+                    {cartUnits > 99 ? "99+" : cartUnits}
+                  </span>
+                ) : null}
+              </Link>
+            ) : null}
           </nav>
         </div>
       ) : null}

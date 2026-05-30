@@ -14,6 +14,9 @@ import ProductosPage from "./app/productos/page";
 import ProveedoresPage from "./app/proveedores/page";
 import ComprasPage from "./app/compras/page";
 import VentasPage from "./app/ventas/page";
+import TiendaCategoriasPage from "./app/tienda/categorias/page";
+import TiendaMarcasPage from "./app/tienda/marcas/page";
+import TiendaProductosPage from "./app/tienda/productos/page";
 
 export default function App() {
   return (
@@ -26,6 +29,13 @@ export default function App() {
             <Route index element={<RootIndexRedirect />} />
             <Route path="mis-ventas" element={<MisVentasPage />} />
             <Route path="no-autorizado" element={<NoAutorizadoPage />} />
+
+            {/* Tienda — Vendedor (catálogo con carrito) */}
+            <Route element={<RequireRol roles={["Vendedor"]} />}>
+              <Route path="tienda/categorias" element={<TiendaCategoriasPage />} />
+              <Route path="tienda/marcas" element={<TiendaMarcasPage />} />
+              <Route path="tienda/productos" element={<TiendaProductosPage />} />
+            </Route>
 
             {/* Ventas — Admin, Vendedor (crear), Contador y Supervisor (solo ver) */}
             <Route element={<RequireRol roles={["Admin", "Vendedor", "Contador", "Supervisor"]} />}>

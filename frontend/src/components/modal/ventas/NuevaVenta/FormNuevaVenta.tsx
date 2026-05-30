@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ShoppingCart } from "lucide-react";
 import { apiClient } from "../../../../lib/apiClient";
 import { useDebouncedValue } from "../../../../hooks/useDebouncedValue";
+import type { NuevaVentaDraftLine } from "../../../../context/nuevaVentaDraftTypes";
 import type { ProductoListItem } from "../../../../types/producto";
 import type { ClienteListItem } from "../../../../types/cliente";
 import type { VentaDetalleRespuesta } from "../../../../types/venta";
@@ -20,9 +21,31 @@ type FormNuevaVentaProps = {
   nitEmpleado: string;
   onClose: () => void;
   onCreated: () => void;
+  initialDraftLines?: NuevaVentaDraftLine[] | null;
 };
 
-export function FormNuevaVenta({ formId, nitEmpleado, onClose, onCreated }: FormNuevaVentaProps) {
+function lineasInicialesFromDraft(d: NuevaVentaDraftLine[] | null | undefined): LineaForm[] {
+  if (!d?.length) {
+    return [{ key: genKey(), id_producto: "", cantidad: 1, productoInput: "" }];
+  }
+  return d.map((l) => ({
+    key: genKey(),
+    id_producto: l.id_producto,
+    cantidad: l.cantidad,
+    productoInput: l.nombre,
+  }));
+}
+
+export function FormNuevaVenta({
+  formId,
+  nitEmpleado,
+  onClose,
+  onCreated,
+  initialDraftLines,
+}: FormNuevaVentaProps) {
+  const [lineas, setLineas] = useState<LineaForm[]>(() =>
+    lineasInicialesFromDraft(initialDraftLines ?? null),
+  );
   const [productos, setProductos] = useState<ProductoListItem[]>([]);
   const [clientes, setClientes] = useState<ClienteListItem[]>([]);
   const [loadErr, setLoadErr] = useState<string | null>(null);
@@ -34,9 +57,6 @@ export function FormNuevaVenta({ formId, nitEmpleado, onClose, onCreated }: Form
   const [clienteMenuOpen, setClienteMenuOpen] = useState(false);
   const clienteContainerRef = useRef<HTMLDivElement>(null);
 
-  const [lineas, setLineas] = useState<LineaForm[]>([
-    { key: genKey(), id_producto: "", cantidad: 1, productoInput: "" },
-  ]);
   const [productMenuOpenKey, setProductMenuOpenKey] = useState<string | null>(null);
   const productContainerRefs = useRef<Map<string, HTMLDivElement>>(new Map());
 

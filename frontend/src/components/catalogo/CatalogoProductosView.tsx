@@ -1,11 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { ProductoCard } from "../../components/producto/ProductoCard";
-import { ProductoDetalle, type Producto } from "../../components/producto/ProductoDetalle";
-import { FloatingButton } from "../../components/Layout/botonflotante";
-import { NuevoProductoModal } from "../../components/modal/NuevoProducto/NuevoProductoModal";
+import { ProductoCard } from "../producto/ProductoCard";
+import { ProductoDetalle, type Producto } from "../producto/ProductoDetalle";
 import { apiClient } from "../../lib/apiClient";
-import { useAuth } from "../../hooks/useAuth";
+import { productoViewToListItem } from "../../lib/productoViewToListItem";
+import { useNuevaVentaDraftOptional } from "../../context/useNuevaVentaDraft";
 
 type ProductoApi = {
   id_producto: number;
@@ -62,14 +61,24 @@ function parseCategoriaFilter(searchParams: URLSearchParams): {
   return { id, nombreLabel };
 }
 
-function ProductoGrid({ productos }: { productos: Producto[] }) {
+type GridProps = {
+  productos: Producto[];
+  onAgregarVenta?: (p: Producto) => void;
+};
+
+function ProductoGrid({ productos, onAgregarVenta }: GridProps) {
   const [selected, setSelected] = useState<Producto | null>(null);
 
   return (
     <>
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
         {productos.map((p) => (
-          <ProductoCard key={p.id} producto={p} onVerDetalle={setSelected} />
+          <ProductoCard
+            key={p.id}
+            producto={p}
+            onVerDetalle={setSelected}
+            onAgregarVenta={onAgregarVenta}
+          />
         ))}
       </div>
 
@@ -78,20 +87,25 @@ function ProductoGrid({ productos }: { productos: Producto[] }) {
   );
 }
 
-export default function ProductosPage() {
-  const { hasRol } = useAuth();
-  const puedeCrear = hasRol("Admin", "Supervisor");
+export type CatalogoProductosViewProps = {
+  productosBasePath: string;
+  enableCarrito: boolean;
+};
+
+export function CatalogoProductosView({
+  productosBasePath,
+  enableCarrito,
+}: CatalogoProductosViewProps) {
+  const draft = useNuevaVentaDraftOptional();
   const [searchParams] = useSearchParams();
   const filtroCategoria = useMemo(() => parseCategoriaFilter(searchParams), [searchParams]);
 
   const [productos, setProductos] = useState<Producto[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [nuevoOpen, setNuevoOpen] = useState(false);
+  const [cartMsg, setCartMsg] = useState<string | null>(null);
 
   const loadProductos = useCallback(async () => {
-    setError(null);
-    setLoading(true);
     try {
       const path =
         filtroCategoria.id != null
@@ -106,6 +120,7 @@ export default function ProductosPage() {
         /* Marca names optional */
       }
       setProductos(mapProductos(prodRows, marcasById));
+      setError(null);
     } catch (e) {
       setError(e instanceof Error ? e.message : "No se pudieron cargar los productos");
       setProductos([]);
@@ -115,8 +130,31 @@ export default function ProductosPage() {
   }, [filtroCategoria.id]);
 
   useEffect(() => {
-    void loadProductos();
+    let isMounted = true;
+    const fetchAll = async () => {
+      if (isMounted) setLoading(true);
+      await loadProductos();
+    };
+    void fetchAll();
+    return () => {
+      isMounted = false;
+    };
   }, [loadProductos]);
+
+  const handleAgregar = useCallback(
+    (p: Producto) => {
+      if (!draft || !enableCarrito) return;
+      const listItem = productoViewToListItem(p);
+      const res = draft.addOrIncrementProduct(listItem, 1);
+      if (res.ok) {
+        setCartMsg("Producto agregado a la venta en curso.");
+      } else {
+        setCartMsg(res.reason);
+      }
+      window.setTimeout(() => setCartMsg(null), 2500);
+    },
+    [draft, enableCarrito],
+  );
 
   if (loading) {
     return (
@@ -124,50 +162,50 @@ export default function ProductosPage() {
     );
   }
 
+  const verTodosHref = productosBasePath;
+
   return (
-    <>
-      <div className="relative mx-auto max-w-[90rem] px-4 pb-28">
-        <h1 className="mb-6 font-sans text-2xl font-bold text-[#0a0a0a]">Productos</h1>
+    <div className="relative mx-auto max-w-[90rem] px-4 pb-28">
+      <h1 className="mb-6 font-sans text-2xl font-bold text-[#0a0a0a]">Productos</h1>
 
-        {filtroCategoria.id != null ? (
-          <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-sky-200 bg-sky-50 px-4 py-3">
-            <p className="font-sans text-sm text-sky-900">
-              <span className="font-semibold">Filtro:</span>{" "}
-              {filtroCategoria.nombreLabel?.trim() || `Categoría #${filtroCategoria.id}`}
-            </p>
-            <Link
-              to="/productos"
-              className="font-sans text-sm font-semibold text-sky-700 underline decoration-sky-400 underline-offset-2 hover:text-sky-900"
-            >
-              Ver todos los productos
-            </Link>
-          </div>
-        ) : null}
+      {enableCarrito && cartMsg ? (
+        <p
+          className="mb-4 rounded-lg border border-sky-200 bg-sky-50 px-3 py-2 text-sm text-sky-900"
+          role="status"
+        >
+          {cartMsg}
+        </p>
+      ) : null}
 
-        {error ? (
-          <p className="font-sans text-[0.9375rem] text-red-600">{error}</p>
-        ) : productos.length === 0 ? (
-          <p className="font-sans text-[0.9375rem] text-[#555]">
-            {filtroCategoria.id != null
-              ? "No hay productos en esta categoría."
-              : "No hay productos registrados."}
+      {filtroCategoria.id != null ? (
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-sky-200 bg-sky-50 px-4 py-3">
+          <p className="font-sans text-sm text-sky-900">
+            <span className="font-semibold">Filtro:</span>{" "}
+            {filtroCategoria.nombreLabel?.trim() || `Categoría #${filtroCategoria.id}`}
           </p>
-        ) : (
-          <ProductoGrid productos={productos} />
-        )}
-      </div>
+          <Link
+            to={verTodosHref}
+            className="font-sans text-sm font-semibold text-sky-700 underline decoration-sky-400 underline-offset-2 hover:text-sky-900"
+          >
+            Ver todos los productos
+          </Link>
+        </div>
+      ) : null}
 
-      {puedeCrear && (
-        <FloatingButton ariaLabel="Nuevo producto" onClick={() => setNuevoOpen(true)} />
-      )}
-
-      {puedeCrear && (
-        <NuevoProductoModal
-          open={nuevoOpen}
-          onClose={() => setNuevoOpen(false)}
-          onSuccess={() => void loadProductos()}
+      {error ? (
+        <p className="font-sans text-[0.9375rem] text-red-600">{error}</p>
+      ) : productos.length === 0 ? (
+        <p className="font-sans text-[0.9375rem] text-[#555]">
+          {filtroCategoria.id != null
+            ? "No hay productos en esta categoría."
+            : "No hay productos registrados."}
+        </p>
+      ) : (
+        <ProductoGrid
+          productos={productos}
+          onAgregarVenta={enableCarrito ? handleAgregar : undefined}
         />
       )}
-    </>
+    </div>
   );
 }

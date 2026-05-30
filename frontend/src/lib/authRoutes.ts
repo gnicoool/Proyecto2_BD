@@ -4,6 +4,9 @@ export const ROUTES = {
   // Vendedor
   misVentas: "/mis-ventas",
   ventas: "/ventas",
+  tiendaCategorias: "/tienda/categorias",
+  tiendaMarcas: "/tienda/marcas",
+  tiendaProductos: "/tienda/productos",
   // Bodeguero
   compras: "/compras",
   // Todos los roles de gestión

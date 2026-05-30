@@ -4,9 +4,10 @@ import { getCategoryIcon } from "./CategoryIcons";
 
 type Props = {
   categoria: Categoria;
+  productosListPath?: string;
 };
 
-export function CategoryCard({ categoria }: Props) {
+export function CategoryCard({ categoria, productosListPath = "/productos" }: Props) {
   const navigate = useNavigate();
   const Icon = getCategoryIcon(categoria.nombre);
 
@@ -15,7 +16,7 @@ export function CategoryCard({ categoria }: Props) {
       id_categoria: String(categoria.id_categoria),
       nombre: categoria.nombre,
     });
-    navigate(`/productos?${params.toString()}`);
+    navigate(`${productosListPath}?${params.toString()}`);
   };
 
   return (

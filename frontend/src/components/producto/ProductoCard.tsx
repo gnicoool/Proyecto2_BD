@@ -3,9 +3,10 @@ import type { Producto } from "./ProductoDetalle";
 type Props = {
   producto: Producto;
   onVerDetalle: (p: Producto) => void;
+  onAgregarVenta?: (p: Producto) => void;
 };
 
-export function ProductoCard({ producto, onVerDetalle }: Props) {
+export function ProductoCard({ producto, onVerDetalle, onAgregarVenta }: Props) {
   const { nombre, marca, categoria, proveedor, cantidad_disponible, activo = true } = producto;
 
   const stockColor =
@@ -38,7 +39,17 @@ export function ProductoCard({ producto, onVerDetalle }: Props) {
         </span>
       </div>
 
-      <div className="flex justify-end">
+      <div className="flex flex-wrap justify-end gap-2">
+        {onAgregarVenta ? (
+          <button
+            type="button"
+            onClick={() => onAgregarVenta(producto)}
+            disabled={!activo || cantidad_disponible < 1}
+            className="rounded-lg border border-emerald-500 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-800 transition hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            Agregar
+          </button>
+        ) : null}
         <button
           type="button"
           onClick={() => onVerDetalle(producto)}
