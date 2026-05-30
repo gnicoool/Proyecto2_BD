@@ -15,15 +15,22 @@ function tabClass(isActive: boolean): string {
 
 // Definición de todas las pestañas y qué roles pueden verlas
 const ALL_TABS = [
-  { label: "Ventas",      to: ROUTES.ventas,      roles: ["Admin", "Vendedor", "Contador"] },
+  // Admin y Vendedor
+  { label: "Ventas",      to: ROUTES.ventas,      roles: ["Admin", "Vendedor", "Contador", "Supervisor"] },
   { label: "Mis Ventas",  to: ROUTES.misVentas,   roles: ["Vendedor"] },
-  { label: "Compras",     to: ROUTES.compras,     roles: ["Admin", "Bodeguero", "Contador"] },
+  // Bodeguero
+  { label: "Compras",     to: ROUTES.compras,     roles: ["Admin", "Bodeguero", "Contador", "Supervisor"] },
+  // Bodeguero: solo ver y Supervisor: crear/editar)
   { label: "Productos",   to: ROUTES.productos,   roles: ["Admin", "Bodeguero", "Supervisor"] },
-  { label: "Informes",    to: ROUTES.informes,    roles: ["Admin", "Contador", "Supervisor"] },
-  { label: "Proveedores", to: ROUTES.proveedores, roles: ["Admin", "Bodeguero", "Supervisor"] },
+  // Supervisor
+  { label: "Proveedores", to: ROUTES.proveedores, roles: ["Admin", "Supervisor", "Contador"] },
+  // Bodeguero ver categorías y marcas (solo lectura)
   { label: "Categorías",  to: ROUTES.categorias,  roles: ["Admin", "Bodeguero"] },
   { label: "Marcas",      to: ROUTES.marcas,      roles: ["Admin", "Bodeguero"] },
+  // Supervisor ver empleados
   { label: "Empleados",   to: ROUTES.empleados,   roles: ["Admin", "Supervisor"] },
+  // Contador y Supervisor
+  { label: "Informes",    to: ROUTES.informes,    roles: ["Admin", "Contador", "Supervisor"] },
 ] as const;
 
 export function Navbar() {

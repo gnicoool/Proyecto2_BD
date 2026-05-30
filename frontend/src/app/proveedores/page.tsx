@@ -20,7 +20,8 @@ function mapProveedor(p: ProveedorListItem): PersonaRow {
 
 export default function ProveedoresPage() {
   const navigate = useNavigate();
-  const { user, isAdmin } = useAuth();
+  const { user, hasRol } = useAuth();
+  const puedeGestionar = hasRol("Admin", "Supervisor");
   const [items, setItems] = useState<ProveedorListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -89,7 +90,7 @@ export default function ProveedoresPage() {
             Proveedores registrados y total de compras asociadas en el sistema.
           </p>
         </div>
-        {isAdmin && (
+        {puedeGestionar && (
           <button
             type="button"
             onClick={() => { setEditProveedor(null); setCreateOpen(true); }}
@@ -101,7 +102,7 @@ export default function ProveedoresPage() {
         )}
       </div>
 
-      {isAdmin && (
+      {puedeGestionar && (
         <NuevoProveedorModal
           open={modalOpen}
           onClose={closeModal}
@@ -121,8 +122,8 @@ export default function ProveedoresPage() {
               data={rows}
               tipo="proveedor"
               onView={verComprasProveedor}
-              onEdit={isAdmin ? openEdit : undefined}
-              onDelete={isAdmin ? handleDelete : undefined}
+              onEdit={puedeGestionar ? openEdit : undefined}
+              onDelete={puedeGestionar ? handleDelete : undefined}
             />
           </div>
         </div>

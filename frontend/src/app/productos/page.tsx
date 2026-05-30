@@ -5,7 +5,6 @@ import { ProductoDetalle, type Producto } from "../../components/producto/Produc
 import { FloatingButton } from "../../components/Layout/botonflotante";
 import { NuevoProductoModal } from "../../components/modal/NuevoProducto/NuevoProductoModal";
 import { apiClient } from "../../lib/apiClient";
-import { adminNitHeaders } from "../../lib/adminHeaders";
 import { useAuth } from "../../hooks/useAuth";
 
 type ProductoApi = {
@@ -80,7 +79,8 @@ function ProductoGrid({ productos }: { productos: Producto[] }) {
 }
 
 export default function ProductosPage() {
-  const { user } = useAuth();
+  const { user, hasRol } = useAuth();
+  const puedeCrear = hasRol("Admin", "Supervisor");
   const [searchParams] = useSearchParams();
   const filtroCategoria = useMemo(() => parseCategoriaFilter(searchParams), [searchParams]);
 
@@ -88,8 +88,6 @@ export default function ProductosPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [nuevoOpen, setNuevoOpen] = useState(false);
-
-  const adminHeaders = user ? adminNitHeaders(user.nit_empleado) : undefined;
 
   const loadProductos = useCallback(async () => {
     setError(null);
@@ -159,14 +157,17 @@ export default function ProductosPage() {
         )}
       </div>
 
-      <FloatingButton ariaLabel="Nuevo producto" onClick={() => setNuevoOpen(true)} />
+      {puedeCrear && (
+        <FloatingButton ariaLabel="Nuevo producto" onClick={() => setNuevoOpen(true)} />
+      )}
 
-      <NuevoProductoModal
-        open={nuevoOpen}
-        onClose={() => setNuevoOpen(false)}
-        onSuccess={() => void loadProductos()}
-        requestHeaders={adminHeaders}
-      />
+      {puedeCrear && (
+        <NuevoProductoModal
+          open={nuevoOpen}
+          onClose={() => setNuevoOpen(false)}
+          onSuccess={() => void loadProductos()}
+        />
+      )}
     </>
   );
 }
